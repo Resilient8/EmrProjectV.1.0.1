@@ -1,0 +1,16 @@
+
+{
+    "compilerOptions": { // ตัวเลือกสำหรับการคอมไพล์
+      "target": "es6",     // แปลงโค้ด TypeScript เป็น JavaScript เวอร์ชัน ES6 (ทันสมัยและใช้งานได้ในเบราว์เซอร์ส่วนใหญ่)
+      "module": "commonjs", // ใช้รูปแบบการจัดการโมดูลแบบ CommonJS (เหมาะกับ Node.js)
+      "outDir": "dist",
+      "esModuleInterop": true 
+           
+    },
+    "include": [           // ไฟล์ TypeScript ที่ต้องการให้ tsc แปล
+      "src/**/*.ts"       // แปลทุกไฟล์ .ts ในโฟลเดอร์ src และโฟลเดอร์ย่อย
+    ],
+    "exclude": [           // ไฟล์หรือโฟลเดอร์ที่ไม่ต้องการให้ tsc แปล
+      "node_modules"       // ไม่ต้องแปลไฟล์ในโฟลเดอร์ node_modules (ไลบรารีภายนอก)
+    ]
+  }
