@@ -1,0 +1,15 @@
+# Dependencies
+frontend/node_modules/
+backend/node_modules/
+
+# Quasar build files
+frontend/.quasar/
+
+# LFS files
+*.dat
+
+# Log files
+*.log
+
+# Environment variables
+.env
