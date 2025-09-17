@@ -1,10 +1,25 @@
-// src/models/diagnosis.ts
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../db/sequelize';
 
-export interface Diagnosis {
-    diagnosis_id: number;
-    diagnosis_name: string;
-    // ถ้าคุณมีคอลัมน์ category_id หรืออื่นๆ ในตาราง Diagnosis ใน DB
-    // ก็สามารถเพิ่มเข้ามาได้
-    category_id?: number;
-    icd_code?: string; // ถ้ามีใน DB
+class Diagnosis extends Model {
+  public diagnosis_id!: number;
+  public diagnosis_name!: string;
 }
+
+Diagnosis.init({
+  diagnosis_id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  diagnosis_name: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+  },
+}, {
+  sequelize,
+  tableName: 'diagnosis', // ชื่อตารางในฐานข้อมูล
+  timestamps: false
+});
+
+export default Diagnosis;

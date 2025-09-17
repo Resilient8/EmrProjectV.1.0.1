@@ -2,7 +2,7 @@
 
 import { RowDataPacket, OkPacket } from 'mysql2/promise';
 import { pool } from '../config/db';
-import { Visit } from '../models/visits';
+import  Visit  from '../models/visits';
 // Import Service ของ Procedure เข้ามา
 import { VisitProcedureService } from './visitProcedure.service';
 

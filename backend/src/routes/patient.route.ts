@@ -1,20 +1,23 @@
 import { Router } from "express";
-import patientController from "../controller/patientController"; // import controller สำหรับผู้ป่วย
+// 👇 Just remove the 's' from 'controllers' here
+import {
+    getPatientRegistry,
+    getAllPatients,
+    getPatientById,
+    createPatient,
+    updatePatient,
+    deletePatientById,
+    updatePatientStatus
+} from '../controller/patientController';
 
 const router = Router();
 
-// เพิ่ม Route ใหม่สำหรับหน้าทะเบียนผู้ป่วย ควรวางไว้บนๆ
-router.get("/registry", patientController.getPatientRegistry);
-
-// กำหนด routes ต่างๆ สำหรับผู้ป่วย
-router.get("/", patientController.getAllPatients);
-router.get("/:id", patientController.getPatientById);
-router.post("/", patientController.createPatient);
-router.put("/:id", patientController.updatePatient);
-router.delete("/:id", patientController.deletePatientById);
-
-// เพิ่ม Route ใหม่สำหรับอัปเดต "สถานะ" ผู้ป่วยโดยเฉพาะ
-// URL: PUT /api/patients/:id/status
-router.put("/:id/status", patientController.updatePatientStatus);
+router.get("/registry", getPatientRegistry);
+router.get("/", getAllPatients);
+router.get("/:id", getPatientById);
+router.post("/", createPatient);
+router.put("/:id", updatePatient);
+router.delete("/:id", deletePatientById);
+router.put("/:id/status", updatePatientStatus);
 
 export default router;

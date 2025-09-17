@@ -8,33 +8,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateVisit = exports.insertVisit = exports.deleteVisitById = exports.selectVisitsByPatientId = exports.selectVisitById = exports.getAllVisits = void 0;
-const db_1 = require("../config/db"); // <<-- เปลี่ยน promisePool เป็น pool เพื่อให้ตรงกับ export ใน db.ts
+const sequelize_1 = require("sequelize");
+const connection_1 = __importDefault(require("./connection"));
 // ฟังก์ชันสำหรับดึงข้อมูลการเยี่ยมทั้งหมด
 const getAllVisits = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [rows] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
-        "SELECT * FROM Visits" // ใช้ชื่อตาราง Visits ตามที่คุณตั้งไว้
-        );
-        return rows.map(row => ({
-            visit_id: row.visit_id,
-            patient_id: row.patient_id,
-            visit_datetime: row.visit_datetime,
-            temperature: row.temperature,
-            pulse: row.pulse,
-            respiration: row.respiration,
-            blood_pressure: row.blood_pressure,
-            height: row.height,
-            weight: row.weight,
-            bmi: row.bmi,
-            waist_circumference: row.waist_circumference,
-            allergies: row.allergies,
-            underlying_diseases: row.underlying_diseases,
-            symptoms: row.symptoms,
-            notes: row.notes,
-            // เพิ่ม Fields อื่นๆ ที่คุณมีในตาราง visits
-        }));
+        const visits = yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
+        "SELECT * FROM Visits", { type: sequelize_1.QueryTypes.SELECT });
+        return visits;
     }
     catch (err) {
         console.error("เกิดข้อผิดพลาดในการดึงข้อมูลการเยี่ยมทั้งหมด:", err);
@@ -45,26 +31,12 @@ exports.getAllVisits = getAllVisits;
 // ฟังก์ชันสำหรับดึงข้อมูลการเยี่ยมตาม ID
 const selectVisitById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [rows] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
-        "SELECT * FROM Visits WHERE visit_id = ?", [id]);
-        return rows.length > 0 ? rows.map(row => ({
-            visit_id: row.visit_id,
-            patient_id: row.patient_id,
-            visit_datetime: row.visit_datetime,
-            temperature: row.temperature,
-            pulse: row.pulse,
-            respiration: row.respiration,
-            blood_pressure: row.blood_pressure,
-            height: row.height,
-            weight: row.weight,
-            bmi: row.bmi,
-            waist_circumference: row.waist_circumference,
-            allergies: row.allergies,
-            underlying_diseases: row.underlying_diseases,
-            symptoms: row.symptoms,
-            notes: row.notes,
-            // เพิ่ม Fields อื่นๆ ที่คุณมีในตาราง visits
-        }))[0] : null;
+        const visits = yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
+        "SELECT * FROM Visits WHERE visit_id = :id", {
+            replacements: { id: id },
+            type: sequelize_1.QueryTypes.SELECT
+        });
+        return visits.length > 0 ? visits[0] : null;
     }
     catch (err) {
         console.error(`เกิดข้อผิดพลาดในการดึงข้อมูลการเยี่ยมที่มี ID ${id}:`, err);
@@ -75,26 +47,12 @@ exports.selectVisitById = selectVisitById;
 // ฟังก์ชันสำหรับดึงข้อมูลการเยี่ยมของผู้ป่วยตาม patient_id
 const selectVisitsByPatientId = (patientId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [rows] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
-        "SELECT * FROM Visits WHERE patient_id = ?", [patientId]);
-        return rows.map(row => ({
-            visit_id: row.visit_id,
-            patient_id: row.patient_id,
-            visit_datetime: row.visit_datetime,
-            temperature: row.temperature,
-            pulse: row.pulse,
-            respiration: row.respiration,
-            blood_pressure: row.blood_pressure,
-            height: row.height,
-            weight: row.weight,
-            bmi: row.bmi,
-            waist_circumference: row.waist_circumference,
-            allergies: row.allergies,
-            underlying_diseases: row.underlying_diseases,
-            symptoms: row.symptoms,
-            notes: row.notes,
-            // เพิ่ม Fields อื่นๆ ที่คุณมีในตาราง visits
-        }));
+        const visits = yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
+        "SELECT * FROM Visits WHERE patient_id = :patientId", {
+            replacements: { patientId: patientId },
+            type: sequelize_1.QueryTypes.SELECT
+        });
+        return visits;
     }
     catch (err) {
         console.error(`เกิดข้อผิดพลาดในการดึงข้อมูลการเยี่ยมของผู้ป่วยที่มี ID ${patientId}:`, err);
@@ -105,11 +63,11 @@ exports.selectVisitsByPatientId = selectVisitsByPatientId;
 // ฟังก์ชันสำหรับลบข้อมูลการเยี่ยมตาม ID
 const deleteVisitById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [result] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
-        "DELETE FROM Visits WHERE visit_id = ?", [id]);
-        if (result.affectedRows === 0) {
-            console.warn(`ไม่พบข้อมูลการเยี่ยมที่มี ID: ${id}`);
-        }
+        yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
+        "DELETE FROM Visits WHERE visit_id = :id", {
+            replacements: { id: id },
+            type: sequelize_1.QueryTypes.DELETE
+        });
     }
     catch (err) {
         console.error("เกิดข้อผิดพลาดในการลบข้อมูลการเยี่ยม:", err);
@@ -120,28 +78,12 @@ exports.deleteVisitById = deleteVisitById;
 // ฟังก์ชันสำหรับเพิ่มข้อมูลการเยี่ยมใหม่
 const insertVisit = (visit) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [result] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
+        yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
         `INSERT INTO Visits (patient_id, visit_datetime, temperature, pulse, respiration, blood_pressure, height, weight, bmi, waist_circumference, allergies, underlying_diseases, symptoms, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-            visit.patient_id,
-            visit.visit_datetime,
-            visit.temperature,
-            visit.pulse,
-            visit.respiration,
-            visit.blood_pressure,
-            visit.height,
-            visit.weight,
-            visit.bmi,
-            visit.waist_circumference,
-            visit.allergies,
-            visit.underlying_diseases,
-            visit.symptoms,
-            visit.notes,
-            // เพิ่ม Fields อื่นๆ ที่คุณต้องการ Insert
-        ]);
-        if (result.affectedRows === 0) {
-            console.warn("การเพิ่มข้อมูลการเยี่ยมไม่สำเร็จ");
-        }
+             VALUES (:patient_id, :visit_datetime, :temperature, :pulse, :respiration, :blood_pressure, :height, :weight, :bmi, :waist_circumference, :allergies, :underlying_diseases, :symptoms, :notes)`, {
+            replacements: Object.assign({}, visit),
+            type: sequelize_1.QueryTypes.INSERT
+        });
     }
     catch (err) {
         console.error("เกิดข้อผิดพลาดในการเพิ่มข้อมูลการเยี่ยม:", err);
@@ -152,43 +94,17 @@ exports.insertVisit = insertVisit;
 // ฟังก์ชันสำหรับอัปเดตข้อมูลการเยี่ยมตาม ID
 const updateVisit = (id, visit) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [result] = yield db_1.pool.query(// <<-- เปลี่ยน promisePool เป็น pool
-        `UPDATE Visits
-            SET patient_id = ?,
-                visit_datetime = ?,
-                temperature = ?,
-                pulse = ?,
-                respiration = ?,
-                blood_pressure = ?,
-                height = ?,
-                weight = ?,
-                bmi = ?,
-                waist_circumference = ?,
-                allergies = ?,
-                underlying_diseases = ?,
-                symptoms = ?,
-                notes = ?
-            WHERE visit_id = ?`, [
-            visit.patient_id,
-            visit.visit_datetime,
-            visit.temperature,
-            visit.pulse,
-            visit.respiration,
-            visit.blood_pressure,
-            visit.height,
-            visit.weight,
-            visit.bmi,
-            visit.waist_circumference,
-            visit.allergies,
-            visit.underlying_diseases,
-            visit.symptoms,
-            visit.notes,
-            id,
-            // เพิ่ม Fields อื่นๆ ที่คุณต้องการ Update
-        ]);
-        if (result.affectedRows === 0) {
-            console.warn(`ไม่พบข้อมูลการเยี่ยมที่มี ID: ${id} สำหรับการอัปเดต`);
-        }
+        yield connection_1.default.query(// <-- เปลี่ยนเป็น sequelize
+        `UPDATE Visits SET 
+                patient_id = :patient_id, visit_datetime = :visit_datetime, temperature = :temperature, 
+                pulse = :pulse, respiration = :respiration, blood_pressure = :blood_pressure, 
+                height = :height, weight = :weight, bmi = :bmi, waist_circumference = :waist_circumference, 
+                allergies = :allergies, underlying_diseases = :underlying_diseases, 
+                symptoms = :symptoms, notes = :notes
+             WHERE visit_id = :id`, {
+            replacements: Object.assign(Object.assign({}, visit), { id: id }),
+            type: sequelize_1.QueryTypes.UPDATE
+        });
     }
     catch (err) {
         console.error("เกิดข้อผิดพลาดในการอัปเดตข้อมูลการเยี่ยม:", err);
@@ -198,9 +114,9 @@ const updateVisit = (id, visit) => __awaiter(void 0, void 0, void 0, function* (
 exports.updateVisit = updateVisit;
 exports.default = {
     selectAll: exports.getAllVisits,
-    selectVisitById: exports.selectVisitById,
-    selectVisitsByPatientId: exports.selectVisitsByPatientId,
-    deleteVisitById: exports.deleteVisitById,
-    insertVisit: exports.insertVisit,
-    updateVisit: exports.updateVisit,
+    selectById: exports.selectVisitById,
+    selectByPatientId: exports.selectVisitsByPatientId,
+    deleteById: exports.deleteVisitById,
+    insert: exports.insertVisit,
+    update: exports.updateVisit,
 };

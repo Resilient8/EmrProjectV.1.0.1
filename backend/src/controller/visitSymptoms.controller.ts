@@ -1,4 +1,4 @@
-// ในไฟล์ src/controller/visitSymptoms.controller.ts
+// src/controller/visitSymptoms.controller.ts (เวอร์ชันแก้ไข)
 
 import { Request, Response, NextFunction } from 'express';
 import { VisitSymptomService } from '../services/visitSymptoms.service';
@@ -12,7 +12,8 @@ export const addVisitSymptoms = async (req: Request, res: Response, next: NextFu
       return res.status(400).json({ message: 'Invalid Visit ID' });
     }
 
-    await VisitSymptomService.addOrUpdateSymptoms(visitId, symptomsData);
+    //               👇 แก้ไขชื่อฟังก์ชันตรงนี้
+    await VisitSymptomService.createOrUpdateVisitSymptoms(visitId, symptomsData);
 
     res.status(201).json({ message: 'Symptoms saved successfully' });
   } catch (error) {

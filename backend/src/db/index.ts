@@ -1,22 +1,53 @@
-import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
+// src/db/index.ts (Final Corrected Version)
+
+import { Sequelize } from 'sequelize';
+import sequelize from './sequelize'; // <-- Import ตัวเชื่อมต่อที่สร้างไว้แล้วเข้ามา
+
+// ----- 1. Import ทุก Model เข้ามา -----
+import User from '../models/user';
+import Patient from '../models/patient';
+import Visit from '../models/visits';
+import Symptom from '../models/symptom';
+import VisitSymptom from '../models/visitSymptoms';
+import Procedure from '../models/procedure';
+import VisitProcedure from '../models/visitProcedures';
+import Service from '../models/services';
+import Department from '../models/department';
+import Doctor from '../models/doctor';
+import Pharmacist from '../models/pharmacist';
+import Diagnosis from '../models/diagnosis';
+import Category from '../models/category';
+import Product from '../models/product';
 
 
-dotenv.config();
+// ----- 2. สร้าง db object เพื่อรวบรวมทุกอย่าง -----
+const db: any = {};
+db.sequelize = sequelize; // ใช้ sequelize ที่ import เข้ามา
+db.Sequelize = Sequelize;
 
-// สร้าง Connection Pool
-const pool = mysql.createPool({
-  // vvv แก้ไขตรงนี้ vvv
-  host: process.env.DATABASE_HOST, // จาก DB_HOST เป็น DATABASE_HOST
-  user: process.env.DATABASE_USER, // จาก DB_USER เป็น DATABASE_USER
-  password: process.env.DATABASE_PASSWORD, // จาก DB_PASSWORD เป็น DATABASE_PASSWORD
-  database: process.env.DATABASE_NAME, // จาก DB_NAME เป็น DATABASE_NAME
-  port: Number(process.env.DATABASE_PORT) || 3306, // เพิ่ม port เข้ามาด้วย
-  // ^^^ ถึงตรงนี้ ^^^
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+db.User = User;
+db.Patient = Patient;
+db.Visit = Visit;
+db.Symptom = Symptom;
+db.VisitSymptom = VisitSymptom;
+db.Procedure = Procedure;
+db.VisitProcedure = VisitProcedure;
+db.Service = Service;
+db.Department = Department;
+db.Doctor = Doctor;
+db.Pharmacist = Pharmacist;
+db.Diagnosis = Diagnosis;
+db.Category = Category;
+db.Product = Product;
+
+
+// ----- 3. ใช้ Loop สร้างความสัมพันธ์อัตโนมัติ -----
+Object.keys(db).forEach(modelName => {
+  if (db[modelName].associate) {
+    db[modelName].associate(db);
+  }
 });
 
-// export pool ออกไปเพื่อให้ไฟล์อื่นเรียกใช้ได้
-export default pool;
+
+// ----- 4. Export db object ที่มีทุกอย่างออกไป -----
+export default db;

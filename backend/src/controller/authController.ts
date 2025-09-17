@@ -1,83 +1,130 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs'; // ใช้ bcryptjs จะจัดการเรื่อง async ได้ง่ายกว่า
-import pool from '../db'; // << ตรวจสอบ path การ import ไฟล์เชื่อมต่อ DB ของคุณให้ถูกต้อง
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
+// --- 1. แก้ไขการ Import ---
+// Import db object ที่มีทุกอย่างเข้ามา
+import db from '../db'; 
+// ดึง Model และ sequelize ที่ต้องใช้ออกมา
+const { User, Doctor, Pharmacist, Department, sequelize } = db; 
+
+// --- 2. ฟังก์ชัน Register (แก้ไขใหม่ทั้งหมด) ---
 export const registerUser = async (req: Request, res: Response) => {
+  // รับข้อมูลจาก frontend
+  const {
+    prefix,
+    firstName,
+    lastName,
+    email,
+    password,
+    role, // 'Doctor', 'Nurse', 'Admin', 'Pharmacist'
+    licenseNumber,
+    specialization, // เฉพาะ Doctor
+    department // ชื่อแผนกของ Doctor
+  } = req.body;
+
+  // เริ่ม Transaction เพื่อให้แน่ใจว่าทุกอย่างสำเร็จหรือล้มเหลวไปพร้อมกัน
+  const t = await sequelize.transaction();
+
   try {
-    // --- จุดที่ 1: แก้ไขการรับข้อมูล ---
-    // เปลี่ยนชื่อตัวแปรให้ตรงกับที่ Frontend ส่งมา (camelCase)
-    const {
-      prefix,
-      firstName,
-      lastName,
-      email,
-      password,
-      userType,
-      licenseNumber,
-      workplace,
-      department,
-      position
-    } = req.body;
-
-    // ตรวจสอบว่ามีอีเมลนี้ในระบบแล้วหรือยัง
-    const [existingUsers]: any = await pool.query('SELECT user_id FROM users WHERE email = ?', [email]);
-
-    if (existingUsers.length > 0) {
+    // ตรวจสอบอีเมลซ้ำ
+    const existingUser = await User.findOne({ where: { email: email } });
+    if (existingUser) {
+      await t.rollback(); // ยกเลิก transaction
       return res.status(409).json({ message: "มีอีเมลนี้อยู่ในระบบแล้ว" });
     }
 
     // Hash รหัสผ่าน
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    const password_hash = await bcrypt.hash(password, 10);
 
-    // --- จุดที่ 2: แก้ไขการสร้าง Object ---
-    // เตรียมข้อมูลเพื่อบันทึก โดยจับคู่ตัวแปร camelCase กับชื่อคอลัมน์ snake_case
-    const newUser = {
+    // สร้างข้อมูลในตาราง users หลัก
+    const newUser = await User.create({
       prefix: prefix,
-      first_name: firstName,      // <-- ใช้ firstName ที่รับมา
-      last_name: lastName,        // <-- ใช้ lastName ที่รับมา
+      first_name: firstName,
+      last_name: lastName,
       email: email,
       password_hash: password_hash,
-      role: userType,             // <-- ใช้ userType ที่รับมา
-      license_number: licenseNumber, // สมมติว่าชื่อคอลัมน์ใน DB คือ license_number
-      workplace: workplace,
-      department: department,
-      position: position
-    };
+      role: role
+    }, { transaction: t });
 
-    // บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
-    await pool.query('INSERT INTO users SET ?', newUser);
+    // ถ้า Role เป็น Doctor ให้สร้างข้อมูลในตาราง doctors ด้วย
+    if (role === 'Doctor') {
+      // ค้นหา department_id จากชื่อ department ที่ส่งมา
+      const departmentRecord = await Department.findOne({ where: { name: department } });
+      if (!departmentRecord) {
+        await t.rollback();
+        return res.status(400).json({ message: `ไม่พบแผนกที่ชื่อว่า '${department}'` });
+      }
 
-    res.status(201).json({ message: 'ลงทะเบียนสำเร็จ!' });
+      await Doctor.create({
+        user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
+        license_number: licenseNumber,
+        specialization: specialization,
+        department_id: departmentRecord.id
+      }, { transaction: t });
+    }
+
+    // ถ้า Role เป็น Pharmacist ให้สร้างข้อมูลในตาราง pharmacists ด้วย
+    if (role === 'Pharmacist') {
+      await Pharmacist.create({
+        user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
+        license_number: licenseNumber
+      }, { transaction: t });
+    }
+
+    // ถ้าทุกอย่างสำเร็จ บันทึก Transaction
+    await t.commit();
+
+    res.status(201).json({ message: 'ลงทะเบียนสำเร็จ!', userId: newUser.user_id });
 
   } catch (error) {
+    // ถ้ามีขั้นตอนไหนพลาด ให้ยกเลิกทั้งหมด
+    await t.rollback();
     console.error("Register Error:", error);
     res.status(500).json({ message: "เกิดข้อผิดพลาดฝั่งเซิร์ฟเวอร์ระหว่างการลงทะเบียน" });
   }
 };
 
+// --- 3. ฟังก์ชัน Login (ปรับปรุง) ---
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    const user = rows[0];
+    // ค้นหาผู้ใช้ พร้อมดึงข้อมูลเฉพาะทางมาด้วยถ้ามี
+    const user = await User.findOne({
+      where: { email: email },
+      include: [
+        { model: Doctor, as: 'doctorInfo', include: [Department] }, // ดึงข้อมูล Doctor และ Department
+        { model: Pharmacist, as: 'pharmacistInfo' } // ดึงข้อมูล Pharmacist
+      ]
+    });
 
     if (!user) {
       return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
     }
 
+    // เปรียบเทียบรหัสผ่าน
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
     }
     
-    delete user.password_hash;
+    // สร้าง JSON Web Token (JWT)
+    const token = jwt.sign(
+      { userId: user.user_id, role: user.role },
+      process.env.JWT_SECRET || 'your_default_secret_key',
+      { expiresIn: '1h' }
+    );
+
+    // แปลงข้อมูล user และลบรหัสผ่านก่อนส่งกลับ
+    const userResponse = user.toJSON();
+    delete userResponse.password_hash;
     
     res.status(200).json({ 
       message: 'เข้าสู่ระบบสำเร็จ', 
-      user: user 
+      user: userResponse,
+      token: token
     });
 
   } catch (error) {

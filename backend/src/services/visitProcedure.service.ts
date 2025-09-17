@@ -1,97 +1,94 @@
-// src/services/visitProcedure.service.ts
+// src/services/visitProcedure.service.ts (เวอร์ชันอัปเกรด)
 
-import { RowDataPacket, OkPacket, PoolConnection } from 'mysql2/promise';
-import { pool } from '../config/db';
-import { VisitProcedure, IProcedureInput, IProcedureOutput } from '../models/visitProcedures';
+import db from '../db'; // Import db object ที่มีทุกอย่างจาก index.ts
+import { IProcedureInput, IProcedureOutput } from '../models/visitProcedures';
 
-// --- Private Helper Function (ใช้ภายใน Class นี้เท่านั้น) ---
-const getIdByName = async (
-  tableName: 'Services' | 'Procedures' | 'Diagnosis',
-  nameColumn: 'service_name' | 'procedure_name' | 'diagnosis_name',
-  idColumn: 'service_id' | 'procedure_id' | 'diagnosis_id',
-  name: string | null
-): Promise<number | null> => {
-  if (!name || name === '-' || name === 'อื่นๆ') {
-    return null;
-  }
-  try {
-    const [rows] = await pool.query<RowDataPacket[]>(`SELECT ${idColumn} FROM ${tableName} WHERE ${nameColumn} = ?`, [name]);
-    return rows.length > 0 ? rows[0][idColumn] : null;
-  } catch (error) {
-    console.error(`Error fetching ID from ${tableName} for name "${name}":`, error);
-    return null;
-  }
-};
-
+const { VisitProcedure, Service, Procedure, Diagnosis, sequelize } = db;
 
 export class VisitProcedureService {
 
-    static async createMultipleProcedures(visitId: number, procedures: IProcedureInput[]): Promise<void> {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-            await connection.query('DELETE FROM VisitProcedures WHERE visit_id = ?', [visitId]);
+  static async createMultipleProcedures(visitId: number, procedures: IProcedureInput[]): Promise<void> {
+    // ใช้ Transaction ของ Sequelize เพื่อความปลอดภัย
+    const t = await sequelize.transaction();
+    try {
+      // 1. ลบรายการเก่าของ visitId นี้ทิ้งทั้งหมดก่อน
+      await VisitProcedure.destroy({
+        where: { visit_id: visitId },
+        transaction: t
+      });
 
-            for (const proc of procedures) {
-                const service_id = await getIdByName('Services', 'service_name', 'service_id', proc.service);
-                const procedure_id = await getIdByName('Procedures', 'procedure_name', 'procedure_id', proc.procedure);
-                const diagnosis_id = await getIdByName('Diagnosis', 'diagnosis_name', 'diagnosis_id', proc.diagnosis);
+      // 2. เตรียมข้อมูลใหม่ทั้งหมดที่จะ Insert
+      const proceduresToCreate = await Promise.all(procedures.map(async (proc) => {
+        // ใช้ Sequelize หา ID จากชื่อให้เราอัตโนมัติ (ถ้าไม่มีก็หาไม่เจอ -> null)
+        const service = await Service.findOne({ where: { service_name: proc.service }, transaction: t });
+        const procedure = proc.procedure ? await Procedure.findOne({ where: { procedure_name: proc.procedure }, transaction: t }) : null;
+        const diagnosis = proc.diagnosis ? await Diagnosis.findOne({ where: { diagnosis_name: proc.diagnosis }, transaction: t }) : null;
 
-                const procedureData: VisitProcedure = {
-                    visit_id: visitId,
-                    service_id: service_id,
-                    procedure_id: procedure_id,
-                    diagnosis_id: diagnosis_id,
-                    notes: proc.notes || null
-                };
-                
-                await connection.query<OkPacket>('INSERT INTO VisitProcedures SET ?', [procedureData]);
-            }
+        return {
+          visit_id: visitId,
+          service_id: service?.service_id || null,
+          procedure_id: procedure?.procedure_id || null,
+          diagnosis_id: diagnosis?.diagnosis_id || null,
+          notes: proc.notes || null,
+        };
+      }));
 
-            await connection.commit();
-        } catch (error) {
-            await connection.rollback();
-            console.error('Transaction failed for adding procedures:', error);
-            throw new Error('Failed to save procedures.');
-        } finally {
-            connection.release();
-        }
+      // 3. สั่ง Bulk Create เพื่อเพิ่มข้อมูลทั้งหมดในครั้งเดียว (มีประสิทธิภาพกว่า)
+      if (proceduresToCreate.length > 0) {
+        await VisitProcedure.bulkCreate(proceduresToCreate, { transaction: t });
+      }
+
+      // 4. ถ้าทุกอย่างสำเร็จ ให้ commit transaction
+      await t.commit();
+
+    } catch (error) {
+      // 5. ถ้ามีอะไรผิดพลาด ให้ rollback transaction
+      await t.rollback();
+      console.error('Transaction failed for adding procedures:', error);
+      throw new Error('Failed to save procedures.');
     }
+  }
 
-    // =================================================================================
-    // ===== START: FIXED CODE BLOCK / จุดที่แก้ไขโค้ด =====
-    // =================================================================================
-    static async getProceduresWithNamesByVisitId(visitId: number): Promise<IProcedureOutput[]> {
-        // SQL query ที่ใช้ LEFT JOIN เพื่อดึงข้อมูลชื่อจากตาราง master ทั้ง 3 ตาราง
-        const query = `
-            SELECT
-                vp.id, -- <<< FIX: เปลี่ยนจาก vp.visit_procedure_id เป็น vp.id
-                vp.visit_id,
-                vp.notes,
-                s.service_name,
-                p.procedure_name,
-                d.diagnosis_name
-            FROM
-                VisitProcedures vp
-            LEFT JOIN
-                Services s ON vp.service_id = s.service_id
-            LEFT JOIN
-                Procedures p ON vp.procedure_id = p.procedure_id
-            LEFT JOIN
-                Diagnosis d ON vp.diagnosis_id = d.diagnosis_id
-            WHERE
-                vp.visit_id = ?;
-        `;
+  static async getProceduresWithNamesByVisitId(visitId: number): Promise<IProcedureOutput[]> {
+    try {
+      // ใช้ .findAll พร้อมกับ `include` เพื่อ JOIN ตารางโดยอัตโนมัติ
+      const results = await VisitProcedure.findAll({
+        where: { visit_id: visitId },
+        include: [
+          {
+            model: Service,
+            attributes: ['service_name'], // ดึงมาแค่ชื่อ
+            required: false // ใช้ LEFT JOIN
+          },
+          {
+            model: Procedure,
+            attributes: ['procedure_name'],
+            required: false
+          },
+          {
+            model: Diagnosis,
+            attributes: ['diagnosis_name'],
+            required: false
+          }
+        ],
+        attributes: ['id', 'visit_id', 'notes'], // เลือกคอลัมน์จากตารางหลัก
+        raw: true, // ทำให้ผลลัพธ์เป็น JSON ธรรมดา
+        nest: true  // จัดกลุ่มผลลัพธ์ที่ JOIN มา
+      });
 
-        try {
-            const [rows] = await pool.query<RowDataPacket[]>(query, [visitId]);
-            return rows as IProcedureOutput[];
-        } catch (error) {
-            console.error('Error fetching procedures with names:', error);
-            throw new Error('Failed to retrieve procedures.');
-        }
+      // จัดรูปแบบข้อมูลใหม่ให้ตรงกับ IProcedureOutput
+      return results.map((r: any) => ({
+        id: r.id,
+        visit_id: r.visit_id,
+        notes: r.notes,
+        service_name: r.Service?.service_name || null,
+        procedure_name: r.Procedure?.procedure_name || null,
+        diagnosis_name: r.Diagnosis?.diagnosis_name || null,
+      }));
+
+    } catch (error) {
+      console.error('Error fetching procedures with names:', error);
+      throw new Error('Failed to retrieve procedures.');
     }
-    // =================================================================================
-    // ===== END: FIXED CODE BLOCK / สิ้นสุดจุดที่แก้ไขโค้ด =====
-    // =================================================================================
+  }
 }

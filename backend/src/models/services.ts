@@ -1,11 +1,25 @@
-// src/models/service.ts
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../db/sequelize';
 
-export interface Service {
-    service_id: number;
-    service_name: string;
-    // ถ้าคุณมีคอลัมน์ category_id หรืออื่นๆ ในตาราง Services ใน DB
-    // และต้องการใช้ใน Backend Model ด้วย ก็สามารถเพิ่มเข้ามาได้
-    category_id?: number;
-    description?: string; // ถ้ามีใน DB
-    cost?: number; // ถ้ามีใน DB
+class Service extends Model {
+  public service_id!: number;
+  public service_name!: string;
 }
+
+Service.init({
+  service_id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  service_name: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+  },
+}, {
+  sequelize,
+  tableName: 'services', // ชื่อตารางในฐานข้อมูล
+  timestamps: false
+});
+
+export default Service;

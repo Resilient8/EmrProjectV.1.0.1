@@ -1,70 +1,111 @@
-// ในไฟล์ src/services/visitSymptoms.service.ts
+// src/services/visitSymptoms.service.ts (เวอร์ชันอัปเกรด)
 
-import { RowDataPacket, OkPacket } from 'mysql2/promise';
-import { pool } from '../config/db';
-import { IVisitSymptom } from '../models/visitSymptoms';
+import db from '../db';
+import { VisitSymptomAttributes } from '../models/visitSymptoms';
+
+const { Visit, Symptom, VisitSymptom, sequelize } = db;
+
+// Interface สำหรับข้อมูล Input ที่รับมาจาก Frontend
+interface ISymptomInput {
+    name: string;
+    duration: string;
+    level: string;
+    details?: string;
+}
+
+// Interface สำหรับข้อมูลภาพรวมของอาการทั้งหมดใน 1 visit
+export interface IVisitSymptomPayload {
+    chiefComplaint: ISymptomInput[]; // อาการสำคัญ (มาเป็น Array)
+    presentIllness: string; // รายละเอียดอาการเพิ่มเติม
+    reviewOfSystems: any; // การซักประวัติเพิ่มเติม (อาจจะเป็น object)
+}
 
 export class VisitSymptomService {
 
-    /**
-     * ดึงข้อมูลอาการตาม Visit ID
-     */
-    static async getSymptomsByVisitId(visitId: number): Promise<IVisitSymptom | null> {
-        const [rows] = await pool.query<RowDataPacket[]>(
-            'SELECT * FROM VisitSymptoms WHERE VisitID = ?',
-            [visitId]
-        );
-        if (rows.length > 0) {  
-            return rows[0] as IVisitSymptom;
-        }
+  /**
+   * สร้างหรืออัปเดตข้อมูลอาการทั้งหมดของ Visit หนึ่งๆ
+   */
+  static async createOrUpdateVisitSymptoms(visitId: number, payload: IVisitSymptomPayload): Promise<void> {
+    const t = await sequelize.transaction();
+    try {
+      // 1. อัปเดตข้อมูลภาพรวม (notes, ROS) ในตาราง Visits หลักก่อน
+      await Visit.update({
+        notes: payload.presentIllness,
+        // สมมติว่า ROS เก็บเป็น JSON ในตาราง Visits
+        review_of_systems: payload.reviewOfSystems 
+      }, {
+        where: { visit_id: visitId },
+        transaction: t
+      });
+
+      // 2. ลบอาการเก่าของ visitId นี้ทิ้งทั้งหมดในตารางเชื่อม
+      await VisitSymptom.destroy({
+        where: { visit_id: visitId },
+        transaction: t
+      });
+
+      // 3. เตรียมข้อมูลอาการใหม่ที่จะสร้าง
+      const symptomsToCreate = await Promise.all(
+        payload.chiefComplaint.map(async (symptomInput) => {
+          // หา symptom_id จาก master table (ถ้าไม่มีก็สร้างใหม่)
+          const [symptomMaster] = await Symptom.findOrCreate({
+            where: { symptom_name: symptomInput.name },
+            defaults: { symptom_name: symptomInput.name },
+            transaction: t
+          });
+          
+          return {
+            visit_id: visitId,
+            symptom_id: symptomMaster.symptom_id,
+            duration: symptomInput.duration || null,
+            level: symptomInput.level || 'pain',
+            details: symptomInput.details || null,
+          };
+        })
+      );
+      
+      // 4. เพิ่มข้อมูลอาการทั้งหมดลงในตารางเชื่อม
+      if (symptomsToCreate.length > 0) {
+        await VisitSymptom.bulkCreate(symptomsToCreate, { transaction: t });
+      }
+
+      // 5. ถ้าทุกอย่างเรียบร้อย ให้ commit
+      await t.commit();
+    } catch (error) {
+      // 6. ถ้ามีปัญหา ให้ rollback
+      await t.rollback();
+      console.error('Transaction failed for adding/updating symptoms:', error);
+      throw new Error('Failed to save symptoms data.');
+    }
+  }
+
+  /**
+   * ดึงข้อมูลอาการทั้งหมดของ Visit หนึ่งๆ พร้อมชื่ออาการ
+   */
+  static async getSymptomsByVisitId(visitId: number): Promise<any> {
+    try {
+      // ใช้ .findByPk พร้อม `include` แบบซ้อนกันเพื่อดึงข้อมูลทั้งหมดในครั้งเดียว
+      const visitWithSymptoms = await Visit.findByPk(visitId, {
+        include: [{
+          model: Symptom,
+          as: 'symptoms', // ชื่อ as ที่เราตั้งไว้ใน Model Visit
+          attributes: ['symptom_name'], // ดึงมาแค่ชื่อ
+          through: {
+            // ดึงข้อมูลจากตารางกลาง (VisitSymptoms) มาด้วย
+            attributes: ['duration', 'level', 'details'] 
+          }
+        }],
+      });
+
+      if (!visitWithSymptoms) {
         return null;
+      }
+      
+      return visitWithSymptoms.toJSON();
+
+    } catch (error) {
+      console.error(`Error fetching symptoms for visit ID ${visitId}:`, error);
+      throw new Error('Failed to retrieve visit symptoms.');
     }
-
-    /**
-     * เพิ่มหรืออัปเดตข้อมูลอาการ
-     */
-    static async addOrUpdateSymptoms(visitId: number, symptomsData: any): Promise<void> {
-        const connection = await pool.getConnection();
-        try {
-            const existingSymptoms = await this.getSymptomsByVisitId(visitId);
-
-            // =================================================================================
-            // ===== START: FIXED CODE BLOCK / จุดที่แก้ไขโค้ด =====
-            // =================================================================================
-            // เตรียมข้อมูลสำหรับบันทึก โดยแปลง Array ให้เป็น JSON String ก่อน
-            const dataToSave: Partial<IVisitSymptom> = {
-                VisitID: visitId,
-                ChiefComplaint: symptomsData.ChiefComplaint,
-                PresentIllness: symptomsData.PresentIllness,
-                ROS_General: JSON.stringify(symptomsData.ROS_General || []),
-                ROS_HeadAndNeck: JSON.stringify(symptomsData.ROS_HeadAndNeck || []),
-                ROS_Respiratory: JSON.stringify(symptomsData.ROS_Respiratory || []),
-                ROS_Cardiovascular: JSON.stringify(symptomsData.ROS_Cardiovascular || []),
-                ROS_Gastrointestinal: JSON.stringify(symptomsData.ROS_Gastrointestinal || []),
-                ROS_Skin: JSON.stringify(symptomsData.ROS_Skin || []),
-            };
-            // =================================================================================
-            // ===== END: FIXED CODE BLOCK / สิ้นสุดส่วนที่แก้ไข =====
-            // =================================================================================
-
-            if (existingSymptoms) {
-                // ถ้ามีข้อมูลเก่า ให้อัปเดต
-                await connection.query<OkPacket>(
-                    'UPDATE VisitSymptoms SET ? WHERE VisitID = ?',
-                    [dataToSave, visitId]
-                );
-            } else {
-                // ถ้าไม่มี ให้สร้างใหม่
-                await connection.query<OkPacket>(
-                    'INSERT INTO VisitSymptoms SET ?',
-                    [dataToSave]
-                );
-            }
-        } catch (error) {
-            console.error('Error in addOrUpdateSymptoms service:', error);
-            throw new Error('Failed to save symptoms.');
-        } finally {
-            connection.release();
-        }
-    }
+  }
 }

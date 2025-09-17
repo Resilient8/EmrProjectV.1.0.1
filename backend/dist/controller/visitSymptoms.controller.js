@@ -1,5 +1,5 @@
 "use strict";
-// ในไฟล์ src/controller/visitSymptoms.controller.ts
+// src/controller/visitSymptoms.controller.ts (เวอร์ชันแก้ไข)
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -19,7 +19,8 @@ const addVisitSymptoms = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         if (isNaN(visitId)) {
             return res.status(400).json({ message: 'Invalid Visit ID' });
         }
-        yield visitSymptoms_service_1.VisitSymptomService.addOrUpdateSymptoms(visitId, symptomsData);
+        //               👇 แก้ไขชื่อฟังก์ชันตรงนี้
+        yield visitSymptoms_service_1.VisitSymptomService.createOrUpdateVisitSymptoms(visitId, symptomsData);
         res.status(201).json({ message: 'Symptoms saved successfully' });
     }
     catch (error) {

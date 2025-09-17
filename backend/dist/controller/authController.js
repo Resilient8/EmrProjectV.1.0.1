@@ -13,61 +13,103 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.loginUser = exports.registerUser = void 0;
-const bcryptjs_1 = __importDefault(require("bcryptjs")); // ใช้ bcryptjs จะจัดการเรื่อง async ได้ง่ายกว่า
-const db_1 = __importDefault(require("../db")); // << ตรวจสอบ path การ import ไฟล์เชื่อมต่อ DB ของคุณให้ถูกต้อง
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+// --- 1. แก้ไขการ Import ---
+// Import db object ที่มีทุกอย่างเข้ามา
+const db_1 = __importDefault(require("../db"));
+// ดึง Model และ sequelize ที่ต้องใช้ออกมา
+const { User, Doctor, Pharmacist, Department, sequelize } = db_1.default;
+// --- 2. ฟังก์ชัน Register (แก้ไขใหม่ทั้งหมด) ---
 const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // รับข้อมูลจาก frontend
+    const { prefix, firstName, lastName, email, password, role, // 'Doctor', 'Nurse', 'Admin', 'Pharmacist'
+    licenseNumber, specialization, // เฉพาะ Doctor
+    department // ชื่อแผนกของ Doctor
+     } = req.body;
+    // เริ่ม Transaction เพื่อให้แน่ใจว่าทุกอย่างสำเร็จหรือล้มเหลวไปพร้อมกัน
+    const t = yield sequelize.transaction();
     try {
-        // --- จุดที่ 1: แก้ไขการรับข้อมูล ---
-        // เปลี่ยนชื่อตัวแปรให้ตรงกับที่ Frontend ส่งมา (camelCase)
-        const { prefix, firstName, lastName, email, password, userType, licenseNumber, workplace, department, position } = req.body;
-        // ตรวจสอบว่ามีอีเมลนี้ในระบบแล้วหรือยัง
-        const [existingUsers] = yield db_1.default.query('SELECT user_id FROM users WHERE email = ?', [email]);
-        if (existingUsers.length > 0) {
+        // ตรวจสอบอีเมลซ้ำ
+        const existingUser = yield User.findOne({ where: { email: email } });
+        if (existingUser) {
+            yield t.rollback(); // ยกเลิก transaction
             return res.status(409).json({ message: "มีอีเมลนี้อยู่ในระบบแล้ว" });
         }
         // Hash รหัสผ่าน
-        const saltRounds = 10;
-        const password_hash = yield bcryptjs_1.default.hash(password, saltRounds);
-        // --- จุดที่ 2: แก้ไขการสร้าง Object ---
-        // เตรียมข้อมูลเพื่อบันทึก โดยจับคู่ตัวแปร camelCase กับชื่อคอลัมน์ snake_case
-        const newUser = {
+        const password_hash = yield bcryptjs_1.default.hash(password, 10);
+        // สร้างข้อมูลในตาราง users หลัก
+        const newUser = yield User.create({
             prefix: prefix,
-            first_name: firstName, // <-- ใช้ firstName ที่รับมา
-            last_name: lastName, // <-- ใช้ lastName ที่รับมา
+            first_name: firstName,
+            last_name: lastName,
             email: email,
             password_hash: password_hash,
-            role: userType, // <-- ใช้ userType ที่รับมา
-            license_number: licenseNumber, // สมมติว่าชื่อคอลัมน์ใน DB คือ license_number
-            workplace: workplace,
-            department: department,
-            position: position
-        };
-        // บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
-        yield db_1.default.query('INSERT INTO users SET ?', newUser);
-        res.status(201).json({ message: 'ลงทะเบียนสำเร็จ!' });
+            role: role
+        }, { transaction: t });
+        // ถ้า Role เป็น Doctor ให้สร้างข้อมูลในตาราง doctors ด้วย
+        if (role === 'Doctor') {
+            // ค้นหา department_id จากชื่อ department ที่ส่งมา
+            const departmentRecord = yield Department.findOne({ where: { name: department } });
+            if (!departmentRecord) {
+                yield t.rollback();
+                return res.status(400).json({ message: `ไม่พบแผนกที่ชื่อว่า '${department}'` });
+            }
+            yield Doctor.create({
+                user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
+                license_number: licenseNumber,
+                specialization: specialization,
+                department_id: departmentRecord.id
+            }, { transaction: t });
+        }
+        // ถ้า Role เป็น Pharmacist ให้สร้างข้อมูลในตาราง pharmacists ด้วย
+        if (role === 'Pharmacist') {
+            yield Pharmacist.create({
+                user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
+                license_number: licenseNumber
+            }, { transaction: t });
+        }
+        // ถ้าทุกอย่างสำเร็จ บันทึก Transaction
+        yield t.commit();
+        res.status(201).json({ message: 'ลงทะเบียนสำเร็จ!', userId: newUser.user_id });
     }
     catch (error) {
+        // ถ้ามีขั้นตอนไหนพลาด ให้ยกเลิกทั้งหมด
+        yield t.rollback();
         console.error("Register Error:", error);
         res.status(500).json({ message: "เกิดข้อผิดพลาดฝั่งเซิร์ฟเวอร์ระหว่างการลงทะเบียน" });
     }
 });
 exports.registerUser = registerUser;
+// --- 3. ฟังก์ชัน Login (ปรับปรุง) ---
 const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
-        const [rows] = yield db_1.default.query('SELECT * FROM users WHERE email = ?', [email]);
-        const user = rows[0];
+        // ค้นหาผู้ใช้ พร้อมดึงข้อมูลเฉพาะทางมาด้วยถ้ามี
+        const user = yield User.findOne({
+            where: { email: email },
+            include: [
+                { model: Doctor, as: 'doctorInfo', include: [Department] }, // ดึงข้อมูล Doctor และ Department
+                { model: Pharmacist, as: 'pharmacistInfo' } // ดึงข้อมูล Pharmacist
+            ]
+        });
         if (!user) {
             return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
         }
+        // เปรียบเทียบรหัสผ่าน
         const isMatch = yield bcryptjs_1.default.compare(password, user.password_hash);
         if (!isMatch) {
             return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
         }
-        delete user.password_hash;
+        // สร้าง JSON Web Token (JWT)
+        const token = jsonwebtoken_1.default.sign({ userId: user.user_id, role: user.role }, process.env.JWT_SECRET || 'your_default_secret_key', { expiresIn: '1h' });
+        // แปลงข้อมูล user และลบรหัสผ่านก่อนส่งกลับ
+        const userResponse = user.toJSON();
+        delete userResponse.password_hash;
         res.status(200).json({
             message: 'เข้าสู่ระบบสำเร็จ',
-            user: user
+            user: userResponse,
+            token: token
         });
     }
     catch (error) {

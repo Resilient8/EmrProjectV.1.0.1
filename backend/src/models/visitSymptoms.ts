@@ -1,17 +1,55 @@
-// สร้างไฟล์ใหม่ที่: src/models/visitSymptoms.ts
-// แล้วคัดลอกโค้ดทั้งหมดนี้ไปวาง
+// src/models/visitSymptoms.ts
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../db/sequelize';
 
-// Interface นี้ใช้สำหรับระบุโครงสร้างของข้อมูลในตาราง VisitSymptoms
-// ซึ่งจะตรงกับคอลัมน์ในฐานข้อมูล
-export interface IVisitSymptom {
-    SymptomID?: number; // Primary Key, อาจจะเป็น id หรือ SymptomID
-    VisitID: number; // Foreign Key, อาจจะเป็น visit_id หรือ VisitID
-    ChiefComplaint?: string | null;
-    PresentIllness?: string | null;
-    ROS_General?: string | null;      // ในฐานข้อมูลจะเก็บเป็น JSON string
-    ROS_HeadAndNeck?: string | null;  // ในฐานข้อมูลจะเก็บเป็น JSON string
-    ROS_Respiratory?: string | null;  // ในฐานข้อมูลจะเก็บเป็น JSON string
-    ROS_Cardiovascular?: string | null;// ในฐานข้อมูลจะเก็บเป็น JSON string
-    ROS_Gastrointestinal?: string | null; // ในฐานข้อมูลจะเก็บเป็น JSON string
-    ROS_Skin?: string | null;         // ในฐานข้อมูลจะเก็บเป็น JSON string
+export interface VisitSymptomAttributes {
+  visit_symptom_id: number;
+  visit_id: number;
+  symptom_id: number;
+  duration?: string;
+  level?: string;
+  details?: string;
 }
+
+class VisitSymptom extends Model<VisitSymptomAttributes> implements VisitSymptomAttributes {
+  public visit_symptom_id!: number;
+  public visit_id!: number;
+  public symptom_id!: number;
+  public duration?: string;
+  public level?: string;
+  public details?: string;
+}
+
+VisitSymptom.init({
+  visit_symptom_id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  visit_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  symptom_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  duration: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  level: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  details: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+}, {
+  sequelize,
+  tableName: 'VisitSymptoms',
+  timestamps: false // ไม่มี createdAt, updatedAt
+});
+
+export default VisitSymptom;

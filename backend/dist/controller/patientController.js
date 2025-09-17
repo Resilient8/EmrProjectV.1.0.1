@@ -1,4 +1,5 @@
 "use strict";
+// src/controller/patientController.ts (เวอร์ชันแก้ไข)
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,166 +13,136 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPatientRegistry = exports.updatePatientStatus = void 0;
+exports.getPatientRegistry = exports.updatePatientStatus = exports.updatePatient = exports.createPatient = exports.deletePatientById = exports.getPatientById = exports.getAllPatients = void 0;
 const db_1 = __importDefault(require("../db"));
-const patient_1 = __importDefault(require("../db/patient"));
-// ... (ฟังก์ชันอื่นๆ ของคุณ getAllPatients, createPatient, etc. ไม่ต้องแก้ไข) ...
-const getAllPatients = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const { Patient, Visit } = db_1.default; // ไม่จำเป็นต้อง import sequelize ถ้าไม่ได้ใช้โดยตรง
+// --- ดึงข้อมูลผู้ป่วยทั้งหมด ---
+const getAllPatients = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const patients = yield patient_1.default.selectAll();
+        const patients = yield Patient.findAll();
         res.status(200).json({
             message: "OK",
             result: patients,
         });
     }
     catch (err) {
-        console.error("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ป่วย:", err);
-        res.status(500).json({
-            message: "DATABASE ERROR",
-            error: err.message || "Unknown error",
-        });
+        next(err);
     }
 });
-const getPatientById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.getAllPatients = getAllPatients;
+// --- ดึงข้อมูลผู้ป่วยตาม ID ---
+const getPatientById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
         return res.status(400).json({ message: "รูปแบบ ID ไม่ถูกต้อง" });
     }
     try {
-        const patient = yield patient_1.default.selectById(id);
+        const patient = yield Patient.findByPk(id);
         if (!patient) {
             return res.status(404).json({ message: "ไม่พบผู้ป่วย" });
         }
         res.status(200).json(patient);
     }
     catch (err) {
-        console.error(`เกิดข้อผิดพลาดในการดึงข้อมูลผู้ป่วยที่มี ID ${id}:`, err);
-        res.status(500).json({
-            message: "DATABASE ERROR",
-            error: err.message || "Unknown error",
-        });
+        next(err);
     }
 });
-const deletePatientById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.getPatientById = getPatientById;
+// --- ลบผู้ป่วยตาม ID ---
+const deletePatientById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
         return res.status(400).json({ message: "รูปแบบ ID ไม่ถูกต้อง" });
     }
     try {
-        yield patient_1.default.deletePatientById(id);
+        const affectedRows = yield Patient.destroy({ where: { id: id } });
+        if (affectedRows === 0) {
+            return res.status(404).json({ message: "ไม่พบผู้ป่วยที่จะลบ" });
+        }
         res.status(200).json({
             message: "OK",
             result: `ผู้ป่วยที่มี ID ${id} ถูกลบเรียบร้อยแล้ว`,
         });
     }
     catch (err) {
-        console.error(`เกิดข้อผิดพลาดในการลบผู้ป่วยที่มี ID ${id}:`, err);
-        res.status(500).json({
-            message: "DATABASE ERROR",
-            error: err.message || "Unknown error",
-        });
+        next(err);
     }
 });
-const createPatient = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const newPatient = req.body;
-    if (!newPatient.firstName || !newPatient.lastName) {
+exports.deletePatientById = deletePatientById;
+// --- สร้างผู้ป่วยใหม่ ---
+const createPatient = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const newPatientData = req.body;
+    if (!newPatientData.first_name || !newPatientData.last_name) {
         return res.status(400).json({ message: "ข้อมูลไม่ถูกต้อง" });
     }
     try {
-        yield patient_1.default.insertPatient(newPatient);
-        res.status(201).json({ message: "สร้างผู้ป่วยเรียบร้อยแล้ว" });
+        const createdPatient = yield Patient.create(newPatientData);
+        res.status(201).json({ message: "สร้างผู้ป่วยเรียบร้อยแล้ว", result: createdPatient });
     }
     catch (err) {
-        console.error("เกิดข้อผิดพลาดในการเพิ่มผู้ป่วย:", err);
-        res.status(500).json({
-            message: "DATABASE ERROR",
-            error: err.message || "Unknown error",
-        });
+        next(err);
     }
 });
-const updatePatient = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.createPatient = createPatient;
+// --- อัปเดตข้อมูลผู้ป่วย ---
+const updatePatient = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const id = parseInt(req.params.id, 10);
-    const updatedPatient = req.body;
-    if (isNaN(id) || !updatedPatient.firstName || !updatedPatient.lastName) {
+    const updatedPatientData = req.body;
+    if (isNaN(id)) {
         return res.status(400).json({ message: "ข้อมูลไม่ถูกต้อง" });
     }
     try {
-        yield patient_1.default.updatePatient(id, updatedPatient);
+        const [affectedRows] = yield Patient.update(updatedPatientData, { where: { id: id } });
+        if (affectedRows === 0) {
+            return res.status(404).json({ message: "ไม่พบผู้ป่วยที่จะอัปเดต" });
+        }
         res.status(200).json({ message: `ผู้ป่วยที่มี ID ${id} ถูกอัปเดตเรียบร้อยแล้ว` });
     }
     catch (err) {
-        console.error(`เกิดข้อผิดพลาดในการอัปเดตผู้ป่วยที่มี ID ${id}:`, err);
-        res.status(500).json({
-            message: "DATABASE ERROR",
-            error: err.message || "Unknown error",
-        });
+        next(err);
     }
 });
-const updatePatientStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.updatePatient = updatePatient;
+// --- อัปเดตสถานะผู้ป่วย ---
+const updatePatientStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const patientId = parseInt(req.params.id, 10);
         const { status } = req.body;
         if (isNaN(patientId) || !status) {
             return res.status(400).json({ message: 'Invalid patient ID or status provided.' });
         }
-        const [result] = yield db_1.default.query('UPDATE patient SET status = ? WHERE id = ?', [status, patientId]);
-        if (result.affectedRows === 0) {
+        const [affectedRows] = yield Patient.update({ status: status }, { where: { id: patientId } });
+        if (affectedRows === 0) {
             return res.status(404).json({ message: `Patient with ID ${patientId} not found.` });
         }
         res.status(200).json({ message: `Patient ${patientId} status updated to ${status}` });
     }
     catch (error) {
-        console.error('Error updating patient status:', error);
-        res.status(500).json({ message: 'Server error while updating status.' });
+        next(error);
     }
 });
 exports.updatePatientStatus = updatePatientStatus;
-/**
- * ดึงข้อมูลสำหรับหน้าทะเบียนผู้ป่วยโดยเฉพาะ
- */
+// --- ดึงข้อมูลสำหรับหน้าทะเบียนผู้ป่วย (เพิ่มการ Log Error) ---
 const getPatientRegistry = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // --- FIX: เปลี่ยนชื่อตารางจาก visit เป็น Visits ---
-        const query = `
-      SELECT
-          p.id,
-          p.prefix,
-          p.first_name,
-          p.last_name,
-          p.patient_id,
-          p.status,
-          p.birth_date,
-          v.visit_datetime AS arrivalTime,
-          v.visit_id
-      FROM
-          patient p
-      JOIN
-          Visits v ON p.patient_id = v.patient_id
-      WHERE
-          v.visit_datetime = (
-              SELECT MAX(v2.visit_datetime)
-              FROM Visits v2
-              WHERE v2.patient_id = p.patient_id
-          )
-      ORDER BY
-          v.visit_datetime DESC;
-    `;
-        const [rows] = yield db_1.default.query(query);
-        res.status(200).json(rows);
+        console.log("--- Running SIMPLIFIED getPatientRegistry query ---");
+        const patientsWithVisits = yield Patient.findAll({
+            include: [{
+                    model: Visit,
+                    as: 'visits',
+                    required: true // ยังคงดึงเฉพาะผู้ป่วยที่มี visit เท่านั้น
+                }],
+            order: [
+                // เรียงลำดับตาม visit ล่าสุด (แต่จะแสดงทุก visit)
+                [{ model: Visit, as: 'visits' }, 'visit_datetime', 'DESC']
+            ]
+        });
+        res.status(200).json(patientsWithVisits);
     }
     catch (error) {
-        console.error('Error fetching patient registry:', error);
-        // ส่งต่อ error ไปให้ middleware จัดการ
+        // --- จุดที่แก้ไข ---
+        console.error("🔥🔥 Error executing getPatientRegistry:", error);
         next(error);
     }
 });
 exports.getPatientRegistry = getPatientRegistry;
-exports.default = {
-    getAllPatients,
-    getPatientById,
-    deletePatientById,
-    createPatient,
-    updatePatient,
-    updatePatientStatus: exports.updatePatientStatus,
-    getPatientRegistry: exports.getPatientRegistry
-};

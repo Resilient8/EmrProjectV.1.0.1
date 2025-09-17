@@ -1,20 +1,14 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const patientController_1 = __importDefault(require("../controller/patientController")); // import controller สำหรับผู้ป่วย
+// 👇 Just remove the 's' from 'controllers' here
+const patientController_1 = require("../controller/patientController");
 const router = (0, express_1.Router)();
-// เพิ่ม Route ใหม่สำหรับหน้าทะเบียนผู้ป่วย ควรวางไว้บนๆ
-router.get("/registry", patientController_1.default.getPatientRegistry);
-// กำหนด routes ต่างๆ สำหรับผู้ป่วย
-router.get("/", patientController_1.default.getAllPatients);
-router.get("/:id", patientController_1.default.getPatientById);
-router.post("/", patientController_1.default.createPatient);
-router.put("/:id", patientController_1.default.updatePatient);
-router.delete("/:id", patientController_1.default.deletePatientById);
-// เพิ่ม Route ใหม่สำหรับอัปเดต "สถานะ" ผู้ป่วยโดยเฉพาะ
-// URL: PUT /api/patients/:id/status
-router.put("/:id/status", patientController_1.default.updatePatientStatus);
+router.get("/registry", patientController_1.getPatientRegistry);
+router.get("/", patientController_1.getAllPatients);
+router.get("/:id", patientController_1.getPatientById);
+router.post("/", patientController_1.createPatient);
+router.put("/:id", patientController_1.updatePatient);
+router.delete("/:id", patientController_1.deletePatientById);
+router.put("/:id/status", patientController_1.updatePatientStatus);
 exports.default = router;

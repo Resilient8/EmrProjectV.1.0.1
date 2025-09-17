@@ -1,10 +1,25 @@
-// src/models/procedure.ts
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../db/sequelize';
 
-export interface Procedure {
-    procedure_id: number;
-    procedure_name: string;
-    // ถ้าคุณมีคอลัมน์ category_id หรืออื่นๆ ในตาราง Procedures ใน DB
-    // ก็สามารถเพิ่มเข้ามาได้
-    category_id?: number;
-    description?: string; // ถ้ามีใน DB
+class Procedure extends Model {
+  public procedure_id!: number;
+  public procedure_name!: string;
 }
+
+Procedure.init({
+  procedure_id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  procedure_name: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+  },
+}, {
+  sequelize,
+  tableName: 'procedures', // ชื่อตารางในฐานข้อมูล
+  timestamps: false
+});
+
+export default Procedure;
