@@ -1,43 +1,53 @@
-// src/models/product.ts (เวอร์ชันที่สมบูรณ์)
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../db/sequelize';
 
-// Interface สำหรับ Attributes (เปลี่ยนชื่อจาก Product เป็น ProductAttributes)
 export interface ProductAttributes {
   id: number;
-  name: string;
+  product_name: string;
   price: number;
+  category_id: number;
 }
 
-// สร้าง Sequelize Model
 class Product extends Model<ProductAttributes> implements ProductAttributes {
   public id!: number;
-  public name!: string;
+  public product_name!: string;
   public price!: number;
+  public category_id!: number;
+
+  static associate(models: any) {
+    this.belongsTo(models.Category, {
+      foreignKey: 'category_id',
+      as: 'category'
+    });
+  }
 }
 
-// กำหนดโครงสร้างตาราง
 Product.init({
   id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true,
-    allowNull: false,
   },
-  name: {
-    type: DataTypes.STRING(255),
+  product_name: {
+    type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
   price: {
-    type: DataTypes.DECIMAL(10, 2), // DECIMAL เหมาะสำหรับข้อมูลทางการเงิน/ราคา
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
+  category_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'categories',
+      key: 'id', // 👈 ต้องแก้เป็น 'id' ครับ (เพราะมันชี้ไปที่ PK ของตาราง Categories)
+    }
+  }
 }, {
   sequelize,
   tableName: 'products',
   timestamps: false
 });
 
-// ทำให้ไฟล์นี้มี Default Export เหมือนไฟล์อื่นๆ
 export default Product;

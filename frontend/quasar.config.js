@@ -9,7 +9,6 @@
 // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js
 
 const ESLintPlugin = require("eslint-webpack-plugin");
-
 const { configure } = require("quasar/wrappers");
 
 module.exports = configure(function (ctx) {
@@ -23,7 +22,7 @@ module.exports = configure(function (ctx) {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-webpack/boot-files
-    boot: ["i18n", "axios",'apexcharts'],
+    boot: ["i18n", "axios", "apexcharts"],
 
     // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-css
     css: ["app.scss"],
@@ -40,8 +39,18 @@ module.exports = configure(function (ctx) {
 
       "roboto-font", // optional, you are not bound to it
       "material-icons", // optional, you are not bound to it
-      "material-icons-outlined"
+      "material-icons-outlined",
     ],
+
+    // 🔥🔥🔥 เพิ่มส่วนนี้ครับ สำคัญมากสำหรับ PINIA 🔥🔥🔥
+    // บอก Quasar ว่าไฟล์ Store อยู่ที่ไหน
+    sourceFiles: {
+      root: 'src',
+      store: 'src/store', // ✅ ชี้ไปที่โฟลเดอร์ store (ไม่มี s) ของคุณ
+      router: 'src/router',
+      indexHtml: 'src/index.template.html'
+    },
+    // ===============================================
 
     // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-build
     build: {
@@ -61,21 +70,27 @@ module.exports = configure(function (ctx) {
       },
       port: 5000,
       open: true, // opens browser window automatically
+
+      // ===== Proxy to Backend =====
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true
+        }
+      }
+      // ==========================
     },
 
     // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-framework
     framework: {
-      // === THIS IS THE FIX ===
-      // We are telling Quasar to activate dark mode by default for the entire app.
       config: {
-        dark: true,
+        dark: true, // Default Dark Mode
       },
-      // =======================
 
       lang: "th", // Quasar language pack
 
       // Quasar plugins
-      plugins: ["Dialog", "Notify","Loading"],
+      plugins: ["Dialog", "Notify", "Loading"],
       iconSet: "material-icons",
     },
 
@@ -117,11 +132,11 @@ module.exports = configure(function (ctx) {
         background_color: "#ffffff",
         theme_color: "#027be3",
         icons: [
-          { src: "icons/icon-128x128.png", sizes: "128x128", type: "image/png", },
-          { src: "icons/icon-192x192.png", sizes: "192x192", type: "image/png", },
-          { src: "icons/icon-256x256.png", sizes: "256x256", type: "image/png", },
-          { src: "icons/icon-384x384.png", sizes: "384x384", type: "image/png", },
-          { src: "icons/icon-512x512.png", sizes: "512x512", type: "image/png", },
+          { src: "icons/icon-128x128.png", sizes: "128x128", type: "image/png" },
+          { src: "icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+          { src: "icons/icon-256x256.png", sizes: "256x256", type: "image/png" },
+          { src: "icons/icon-384x384.png", sizes: "384x384", type: "image/png" },
+          { src: "icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
         ],
       },
     },

@@ -1,705 +1,642 @@
 <template>
-  <q-page padding class="dashboard-background">
-    <div class="q-pa-md">
+  <q-page class="dashboard-background">
 
-      <!-- Header Section -->
-      <div class="header-section main-card interactive-card q-pa-md q-mb-lg row items-center justify-between list-item-animation" style="animation-delay: 0.1s;">
-        <div class="row items-center">
-          <q-icon name="o_medication" size="lg" class="q-mr-md header-icon" />
-          <div class="text-h5 text-weight-bold header-title">ค้นหารายการจ่ายยา</div>
-        </div>
+    <transition name="fade">
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text q-mt-md">กำลังโหลดข้อมูล...</div>
       </div>
+    </transition>
 
-      <!-- Filter Card -->
-      <q-card class="filter-card main-card interactive-card q-mb-lg list-item-animation" flat bordered style="animation-delay: 0.2s;">
-        <q-card-section>
-          <div class="row items-center q-gutter-md">
-            <div class="col-xs-12 col-sm-grow">
-              <q-input
-                dark v-model="searchQuery" dense outlined placeholder="ค้นหาชื่อ, ID, ยา..." clearable
-                @clear="playRemoveSound"
-                @focus="playFormFocusSound"
-                @mouseenter="throttledPlayHoverSound"
-                class="custom-q-input" >
-                <template v-slot:prepend> <q-icon name="o_search" /> </template>
-              </q-input>
+    <div class="q-pa-lg content-container">
+
+      <q-card class="main-card glass-panel q-mb-lg">
+        <q-card-section class="q-pb-none">
+          <div class="row items-center justify-between wrap q-col-gutter-md">
+            <div class="col-12 col-md-auto row items-center">
+              <div class="icon-box-flat q-mr-md">
+                <q-icon name="local_pharmacy" size="28px" color="white" />
+              </div>
+              <div>
+                <div class="text-h5 text-weight-bold text-white leading-tight">Pharmacy Dashboard</div>
+                <div class="text-caption text-teal-3">ระบบบริหารจัดการคิวจ่ายยา</div>
+              </div>
             </div>
-            <div class="col-auto">
-                <q-btn-toggle
-                  v-model="viewMode"
-                  unelevated
-                  toggle-color="primary"
-                  color="rgba(0, 184, 255, 0.1)"
-                  text-color="primary"
-                  :options="[
-                    {icon: 'o_view_list', value: 'table', slot: 'table-view'},
-                    {icon: 'o_grid_view', value: 'cards', slot: 'card-view'}
-                  ]"
-                  @update:model-value="playClickSound"
-                  @mouseenter="throttledPlayHoverSound"
-                  class="view-toggle"
-                >
-                  <template v-slot:table-view>
-                    <q-tooltip class="tooltip-glassy" anchor="top middle" self="bottom middle">มุมมองตาราง</q-tooltip>
-                  </template>
-                  <template v-slot:card-view>
-                    <q-tooltip class="tooltip-glassy" anchor="top middle" self="bottom middle">มุมมองการ์ด</q-tooltip>
-                  </template>
-                </q-btn-toggle>
+
+            <div class="col-12 col-md-auto row q-gutter-x-md">
+              <q-btn-toggle
+                v-model="viewMode"
+                unelevated rounded
+                class="glass-toggle"
+                text-color="grey-5"
+                toggle-color="teal-4"
+                toggle-text-color="black"
+                :options="[{icon: 'grid_view', value: 'cards'}, {icon: 'view_list', value: 'table'}]"
+              />
+              <q-btn
+                icon="refresh"
+                label="รีเฟรช"
+                @click="manualRefresh"
+                class="action-btn-flat"
+                unelevated no-caps rounded
+              />
             </div>
           </div>
         </q-card-section>
-        <q-separator dark />
+
         <q-card-section>
-            <div class="row items-center q-gutter-x-md q-gutter-y-sm">
-                <div class="text-caption welcome-text q-mr-sm">สถานะการจัดยา:</div>
-                <q-btn
-                  v-for="option in statusFilterOptions"
-                  :key="option.value || 'all'"
-                  :label="`${option.label} (${option.count})`"
-                  @click="() => { statusFilter = option.value; playClickSound(); }"
-                  @mouseenter="throttledPlayHoverSound"
-                  :class="['status-pill', getStatusPillClass(option.value)]"
-                  unelevated
-                  no-caps
-                  rounded
-                />
-            </div>
+          <div class="filter-bar row items-center q-gutter-sm q-py-sm">
+
+            <q-tabs
+              v-model="statusFilter"
+              dense
+              class="text-grey-5 status-tabs"
+              active-color="teal-3"
+              indicator-color="teal-3"
+              narrow-indicator
+            >
+              <q-tab :name="null" label="ทั้งหมด" />
+              <q-tab name="กำลังรับยา" label="กำลังจัดยา" />
+              <q-tab name="รอรับยา" label="รอเรียก" />
+              <q-tab name="จ่ายยาแล้ว" label="เสร็จสิ้น" />
+            </q-tabs>
+
+            <q-space />
+
+            <q-select
+                dark dense outlined rounded
+                v-model="selectedDate"
+                :options="dateOptions"
+                label="ประจำวันที่"
+                class="search-input q-mr-sm"
+                color="teal-3"
+                style="width: 260px;"
+                emit-value
+                map-options
+                popup-content-class="glass-menu"
+                @update:model-value="handleDateSelect"
+            >
+                <template v-slot:selected>
+                    <div class="row items-center">
+                        <q-icon name="event" size="xs" class="q-mr-xs text-teal-3"/>
+                        {{ selectedDateLabel }}
+                    </div>
+                </template>
+
+                <template v-slot:option="scope">
+                    <q-item v-bind="scope.itemProps" class="list-row-hover">
+                        <template v-if="scope.opt.value !== 'custom'">
+                            <q-item-section avatar>
+                                <div :class="['status-dot', scope.opt.hasData ? 'bg-green-4' : 'bg-grey-7']"></div>
+                            </q-item-section>
+                            <q-item-section>
+                                <q-item-label class="text-white">{{ scope.opt.label }}</q-item-label>
+                                <q-item-label caption class="text-grey-5">{{ scope.opt.subLabel }}</q-item-label>
+                            </q-item-section>
+                            <q-item-section side v-if="scope.opt.hasData">
+                                <q-badge color="teal-9" text-color="teal-2" rounded label="มีข้อมูล" />
+                            </q-item-section>
+                        </template>
+                        <template v-else>
+                            <q-item-section avatar>
+                                <q-icon name="edit_calendar" color="teal-3" />
+                            </q-item-section>
+                            <q-item-section>
+                                <q-item-label class="text-teal-3 text-weight-bold">เลือกวันที่อื่น / ปฏิทิน</q-item-label>
+                            </q-item-section>
+                        </template>
+                    </q-item>
+                </template>
+            </q-select>
+
+            <q-input
+              dark dense outlined rounded
+              v-model="searchQuery"
+              placeholder="ค้นหา (ชื่อ, HN...)"
+              class="search-input"
+              color="teal-3"
+              clearable
+            >
+              <template v-slot:prepend><q-icon name="search" /></template>
+            </q-input>
+          </div>
         </q-card-section>
       </q-card>
 
-      <!-- Results Section -->
-      <div v-if="paginatedQueue.length > 0">
-        <div
-          v-if="viewMode === 'cards'"
-          :key="`cards-${statusFilter}-${searchQuery}`"
-          class="row q-col-gutter-lg items-stretch"
-        >
-          <div
-            v-for="(patient, index) in paginatedQueue"
-            :key="`card-${patient.id}`"
-            class="col-12 col-md-6 col-lg-4 list-item-animation"
-            :style="{'animation-delay': `${index * 50}ms`}"
-          >
-            <q-card :class="['patient-card main-card interactive-card', getStatusBorderClass(patient.status)]" flat bordered @click="() => { goToDispensing(patient); playClickSound(); }" @mouseenter="throttledPlayHoverSound">
-              <q-item class="q-pa-md">
-                <q-item-section avatar>
-                  <q-avatar color="primary" text-color="white" icon="o_person" size="lg"/>
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-bold text-h6 ellipsis">{{ patient.patientName }}</q-item-label>
-                  <q-item-label caption class="welcome-text">ID: {{ patient.patientId }}</q-item-label>
-                </q-item-section>
-                  <q-item-section side>
-                    <q-chip :class="getStatusChipClass(patient.status)">{{ patient.status }}</q-chip>
-                  </q-item-section>
-              </q-item>
-              <q-separator dark />
-              <q-card-section class="col">
-                <div class="medication-container">
-                  <div class="row items-start no-wrap q-mb-sm">
-                    <q-icon name="o_medication" size="sm" color="welcome-text" class="q-mt-xs q-mr-sm" />
-                    <div>
-                      <div class="welcome-text text-caption">ยาที่สั่งโดยแพทย์</div>
-                      <div v-for="(med, medIndex) in patient.medications.slice(0, 2)" :key="medIndex" class="text-body1 ellipsis">{{ med.name }}</div>
-                      <q-btn
-                        v-if="patient.medications.length > 2"
-                        :label="`...และอีก ${patient.medications.length - 2} รายการ`"
-                        color="primary" flat dense size="sm" no-caps
-                        class="q-pa-none q-mt-xs"
-                        @click.stop="() => { showAllMeds(patient); playClickSound(); }"
-                        @mouseenter="throttledPlayHoverSound"
-                      />
+      <div v-if="!loading && paginatedPatients.length > 0">
+
+        <div v-if="viewMode === 'cards'" class="row q-col-gutter-lg">
+          <div v-for="(patient, index) in paginatedPatients" :key="patient.id" class="col-12 col-md-6 col-lg-4 col-xl-3 list-item-animation" :style="{ animationDelay: `${index * 0.05}s` }">
+            <q-card class="patient-card glass-panel" @click="openDispenseHandler(patient)">
+              <div class="card-content">
+                <div class="row no-wrap items-center q-mb-md">
+                  <div class="avatar-container-outer q-mr-md">
+                    <div class="avatar-wrapper" @click.stop="openImagePreview(patient.avatarUrl)">
+                      <q-avatar size="64px" class="shadow-3">
+                        <img v-if="patient.avatarUrl" :src="patient.avatarUrl" class="avatar-img">
+                        <q-icon v-else name="person" color="grey-4" class="bg-blue-grey-9" />
+                      </q-avatar>
+                      <div class="zoom-overlay"><q-icon name="zoom_in" color="white" size="24px"/></div>
                     </div>
+                    <q-badge v-if="patient.visits.length > 1" color="orange-7" rounded class="new-badge-absolute shadow-2" style="position: absolute; top: -6px; right: -6px; z-index: 10;">{{ patient.visits.length }}</q-badge>
+                  </div>
+                  <div class="col overflow-hidden">
+                    <div class="text-h6 text-white ellipsis text-weight-bold">{{ patient.patientName }}</div>
+                    <div class="text-caption text-grey-4">HN: {{ patient.patientId }}</div>
+                    <q-chip dense size="sm" class="q-mt-xs q-ml-none glass-chip" :class="getStatusChipClass(patient.status)">
+                      {{ patient.status }}
+                    </q-chip>
+                  </div>
+                  <div><q-btn flat round icon="chevron_right" color="grey-5" size="md" class="hover-white" /></div>
+                </div>
+                <q-separator dark class="opacity-20 q-mb-sm" />
+                <div class="info-grid">
+                  <div class="info-item">
+                    <q-icon name="access_time" size="xs" color="teal-3" class="q-mr-xs" />
+                    <span class="text-grey-4">เวลา:</span>
+                    <span class="text-white q-ml-xs font-mono">{{ formatTime(patient.latestTime) }}</span>
+                  </div>
+                  <div class="info-item">
+                    <q-icon name="format_list_bulleted" size="xs" color="orange-4" class="q-mr-xs" />
+                    <span class="text-grey-4">รายการยา:</span>
+                    <span class="text-white q-ml-xs text-weight-bold">{{ patient.totalPrescriptions }}</span>
                   </div>
                 </div>
-                <div class="row items-center no-wrap"><q-icon name="o_badge" size="sm" color="welcome-text" class="q-mr-sm" /><div><div class="welcome-text text-caption">แพทย์ผู้สั่ง</div><div class="text-body1">{{ patient.doctorName }}</div></div></div>
-              </q-card-section>
-              <q-card-actions class="q-pa-md">
-                <q-btn class="primary-action-btn full-width" label="ดำเนินการจัดยา" icon-right="o_arrow_forward" unelevated padding="sm lg" />
-              </q-card-actions>
+              </div>
             </q-card>
           </div>
         </div>
 
-        <q-table
-          v-else-if="viewMode === 'table'"
-          :key="`table-${statusFilter}-${searchQuery}`"
-          :rows="paginatedQueue"
-          :columns="columns"
-          row-key="id"
-          class="themed-table list-item-animation"
-          dark flat
-          @row-click="onRowClick"
-          hide-pagination
-          style="animation-delay: 0.3s;"
-        >
-          <template v-slot:body="props">
-            <q-tr :props="props" class="table-row-item" @mouseenter="throttledPlayHoverSound">
-              <q-td key="patient" :props="props">
-                <div class="cell-content">
-                  <q-avatar color="primary" text-color="white" icon="o_person" size="md" />
-                  <div class="q-ml-md">
-                    <div class="text-weight-bold">{{ props.row.patientName }}</div>
-                    <div class="welcome-text text-caption">ID: {{ props.row.patientId }}</div>
+        <div v-else-if="viewMode === 'table'" class="list-view-container">
+          <div class="row q-px-md q-py-sm text-grey-5 text-uppercase text-caption text-weight-bold list-header">
+            <div class="col-4">ข้อมูลผู้ป่วย</div>
+            <div class="col-2 text-center">เวลาส่งมา</div>
+            <div class="col-2 text-center">จำนวนยา</div>
+            <div class="col-3 text-center">สถานะ</div>
+            <div class="col-1 text-right">จัดการ</div>
+          </div>
+          <div
+            v-for="(patient, index) in paginatedPatients"
+            :key="patient.id"
+            class="list-row glass-panel q-mb-sm cursor-pointer list-item-animation"
+            :style="{ animationDelay: `${index * 0.03}s` }"
+            @click="openDispenseHandler(patient)"
+          >
+            <div class="row items-center q-pa-md">
+              <div class="col-4 row items-center no-wrap">
+                <div class="avatar-wrapper-mini q-mr-md" @click.stop="openImagePreview(patient.avatarUrl)">
+                  <q-avatar size="48px" class="shadow-2 bg-dark">
+                    <img v-if="patient.avatarUrl" :src="patient.avatarUrl" class="avatar-img">
+                    <q-icon v-else name="person" color="grey-4" />
+                  </q-avatar>
+                  <q-badge v-if="patient.visits.length > 1" color="orange-7" rounded floating class="mini-new-badge">{{ patient.visits.length }}</q-badge>
+                </div>
+                <div>
+                  <div class="text-body1 text-white text-weight-bold ellipsis">{{ patient.patientName }}</div>
+                  <div class="text-caption text-teal-2 row items-center">
+                    <q-icon name="badge" size="10px" class="q-mr-xs" /> {{ patient.patientId }}
                   </div>
                 </div>
-              </q-td>
-              <q-td key="medications" :props="props">
-                  <div class="cell-content">
-                    <q-icon name="o_medication" color="welcome-text" class="q-mr-sm" />
-                    <div>
-                      <div v-for="(med, index) in props.row.medications.slice(0, 1)" :key="index" class="ellipsis">{{ med.name }}</div>
-                      <div v-if="props.row.medications.length > 1" class="welcome-text text-caption">...และอีก {{ props.row.medications.length - 1 }} รายการ</div>
-                    </div>
-                  </div>
-              </q-td>
-              <q-td key="doctorName" :props="props">
-                  <div class="cell-content">
-                    <q-icon name="o_badge" color="welcome-text" class="q-mr-sm" />
-                    <span>{{ props.row.doctorName }}</span>
-                  </div>
-              </q-td>
-              <q-td key="status" :props="props">
-                <div class="cell-content justify-center">
-                  <q-chip :class="getStatusChipClass(props.row.status)">{{ props.row.status }}</q-chip>
-                </div>
-              </q-td>
-              <q-td key="actions" :props="props">
-                <div class="cell-content justify-end">
-                  <q-btn class="primary-action-btn" label="จัดยา" icon-right="o_arrow_forward_ios" @click.stop="() => { goToDispensing(props.row); playClickSound(); }" unelevated padding="xs lg" no-caps />
-                </div>
-              </q-td>
-            </q-tr>
-          </template>
-          <template v-slot:no-data>
-            <div class="full-width row flex-center text-primary q-gutter-sm q-pa-xl">
-              <q-icon size="4em" name="o_search_off" />
-              <div class="text-h6">ไม่พบข้อมูลผู้ป่วยที่ตรงกับเงื่อนไข</div>
+              </div>
+              <div class="col-2 text-center text-grey-4 text-body2 font-mono">{{ formatTime(patient.latestTime) }}</div>
+              <div class="col-2 text-center"><q-badge color="teal-9" text-color="teal-2" :label="patient.totalPrescriptions" class="text-weight-bold q-px-sm" /></div>
+              <div class="col-3 text-center"><q-chip dense :class="getStatusChipClass(patient.status)" size="sm" class="glass-chip">{{ patient.status }}</q-chip></div>
+              <div class="col-1 row justify-end items-center no-wrap">
+                <q-btn flat round dense icon="arrow_forward" color="grey-5" class="hover-icon"><q-tooltip class="bg-black">ดำเนินการ</q-tooltip></q-btn>
+              </div>
             </div>
-          </template>
-        </q-table>
+          </div>
+        </div>
 
-      </div>
-      <div v-else class="list-item-animation" style="animation-delay: 0.3s;"><q-card flat bordered class="no-data-card main-card"><q-card-section class="text-center q-pa-xl"><q-icon name="o_medication" size="6em" class="placeholder-icon" /><div class="text-h5 welcome-text q-mt-md">ไม่พบรายการจ่ายยา</div><p class="welcome-text">ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ</p></q-card-section></q-card></div>
-
-      <div v-if="maxPages > 1" class="row justify-center q-mt-lg list-item-animation" style="animation-delay: 0.4s;">
-        <div class="pagination-container">
+        <div class="row justify-center q-mt-xl">
           <q-pagination
-            dark
-            v-model="currentPage"
-            :max="maxPages"
+            v-model="currentPage" :max="maxPages"
             direction-links
-            active-design="unelevated"
-            active-color="primary"
-            gutter="sm"
-            class="pagination-control"
-            @update:model-value="playClickSound"
-            @mouseenter="throttledPlayHoverSound"
+            color="teal-3" active-color="teal-6" active-text-color="white"
+            class="glass-pagination"
           />
         </div>
+
+      </div>
+
+      <div v-else-if="!loading" class="column items-center justify-center q-pa-xl text-grey-5">
+        <q-icon name="assignment_turned_in" size="80px" class="opacity-30 q-mb-md" />
+        <div class="text-h6 opacity-80">ไม่พบรายการค้างจ่ายยา</div>
+        <div class="text-caption opacity-60">สำหรับวันที่ {{ selectedDateLabel }}</div>
       </div>
 
     </div>
+
+    <q-dialog v-model="showVisitSelector" backdrop-filter="blur(4px)" transition-show="scale" transition-hide="scale">
+      <q-card class="glass-panel" style="min-width: 350px; max-width: 500px; width: 100%;">
+
+        <div class="row items-center justify-between q-pa-md bg-white-5" style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <div class="text-subtitle1 text-white text-weight-bold row items-center">
+             <q-icon name="history" class="q-mr-sm text-teal-3"/>
+             เลือกรายการที่ต้องการ
+          </div>
+          <q-btn dense flat round icon="close" color="grey-4" v-close-popup class="hover-rotate"/>
+        </div>
+
+        <q-card-section class="q-pa-sm">
+          <div class="text-caption text-grey-5 q-mb-sm q-px-sm">คนไข้: <span class="text-white">{{ selectedPatient?.patientName }}</span></div>
+
+          <q-list class="q-gutter-y-sm">
+            <q-item
+              v-for="(visit, index) in selectedPatient?.visits"
+              :key="visit.visit_id"
+              clickable v-ripple
+              @click="goToDispensePage(visit.visit_id)"
+              class="visit-item-card"
+            >
+              <q-item-section avatar>
+                <q-avatar color="teal-9" text-color="teal-2" size="sm" font-size="12px" class="text-weight-bold">
+                    {{ index + 1 }}
+                </q-avatar>
+              </q-item-section>
+
+              <q-item-section>
+                <q-item-label class="text-white text-weight-bold">เวลา {{ formatTime(visit.time) }}</q-item-label>
+                <q-item-label caption class="text-grey-4">ยา: <span class="text-teal-3">{{ visit.prescriptionCount }} รายการ</span></q-item-label>
+              </q-item-section>
+
+              <q-item-section side>
+                  <q-chip :class="getStatusChipClass(visit.status)" size="sm" class="glass-chip no-shadow">{{ visit.status }}</q-chip>
+              </q-item-section>
+
+              <q-item-section side>
+                <q-icon name="chevron_right" color="grey-6" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="showCalendarDialog" backdrop-filter="blur(4px)">
+        <q-card class="glass-panel">
+            <q-date
+                v-model="tempSelectedDate"
+                mask="YYYY-MM-DD"
+                color="teal-6"
+                dark
+                class="no-shadow bg-transparent"
+                :events="checkCalendarEvent"
+                event-color="green-4"
+            />
+            <div class="row justify-end q-pa-sm">
+                <q-btn flat label="ยกเลิก" color="grey-4" v-close-popup />
+                <q-btn flat label="ตกลง" color="teal-3" text-color="black" class="bg-teal-3" @click="confirmCalendarDate" />
+            </div>
+        </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="showImageDialog" backdrop-filter="blur(10px)">
+      <div class="relative-position shadow-24" style="border-radius: 12px; overflow: hidden; max-width: 90vw; max-height: 90vh;">
+         <img :src="previewImageUrl" style="display: block; max-width: 100%; max-height: 85vh; object-fit: contain;">
+         <div class="absolute-top-right q-ma-sm">
+            <q-btn round dense color="black" text-color="white" icon="close" v-close-popup class="glass-btn" />
+         </div>
+      </div>
+    </q-dialog>
+
   </q-page>
 </template>
 
 <script setup>
-import * as Tone from 'tone';
-import { ref, computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useQuasar } from 'quasar';
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useQuasar, date } from 'quasar'
+import axios from 'axios'
 
-// --- SOUND SYSTEM ---
-const createSynth = (synth, options, volume) => {
-  const s = new synth(options).toDestination();
-  s.volume.value = volume;
-  return s;
+const $q = useQuasar()
+const router = useRouter()
+const route = useRoute()
+
+// Data Variables
+const rawQueue = ref([])
+const loading = ref(true)
+const searchQuery = ref('')
+const statusFilter = ref(null)
+const viewMode = ref('cards')
+const currentPage = ref(1)
+const rowsPerPage = ref(12)
+const showVisitSelector = ref(false)
+const selectedPatient = ref(null)
+
+// --- Image Preview ---
+const showImageDialog = ref(false)
+const previewImageUrl = ref('')
+const openImagePreview = (url) => { if (url) { previewImageUrl.value = url; showImageDialog.value = true; } }
+
+// --- Date & Calendar ---
+const selectedDate = ref(null)
+const dateOptions = ref([])
+const showCalendarDialog = ref(false)
+const tempSelectedDate = ref(null)
+const activeDatesSet = ref(new Set())
+
+const thaiDateLocale = {
+  days: 'อาทิตย์_จันทร์_อังคาร_พุธ_พฤหัสบดี_ศุกร์_เสาร์'.split('_'),
+  daysShort: 'อา._จ._อ._พ._พฤ._ศ._ส.'.split('_'),
+  months: 'มกราคม_กุมภาพันธ์_มีนาคม_เมษายน_พฤษภาคม_มิถุนายน_กรกฎาคม_สิงหาคม_กันยายน_ตุลาคม_พฤศจิกายน_ธันวาคม'.split('_'),
+  monthsShort: 'ม.ค._ก.พ._มี.ค._เม.ย._พ.ค._มิ.ย._ก.ค._ส.ค._ก.ย._ต.ค._พ.ย._ธ.ค.'.split('_')
 };
 
-const hoverSynth = createSynth(Tone.NoiseSynth, { noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } }, -28);
-const clickSynth = createSynth(Tone.FMSynth, { harmonicity: 8, modulationIndex: 2, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 }, modulation: { type: "square" }, modulationEnvelope: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.2 } }, -10);
-const formFocusSynth = createSynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.1 } }, -20);
-const removeSynth = createSynth(Tone.MembraneSynth, { pitchDecay: 0.05, octaves: 10, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: 'exponential' } }, -12);
-
-let lastHoverTime = 0;
-const throttleDelay = 100;
-
-const playSound = (synth, note, duration) => {
-  if (Tone.context.state !== 'running') Tone.context.resume();
-  synth.triggerAttackRelease(note, duration);
-};
-
-const throttledPlayHoverSound = () => {
-  const now = Date.now();
-  if (now - lastHoverTime > throttleDelay) {
-    playSound(hoverSynth, "C4", "8n");
-    lastHoverTime = now;
-  }
-};
-const playClickSound = () => playSound(clickSynth, "C5", "32n");
-const playFormFocusSound = () => playSound(formFocusSynth, "G5", "32n");
-const playRemoveSound = () => playSound(removeSynth, "C2", "8n");
-// --- END OF SOUNDS ---
-
-const router = useRouter();
-const $q = useQuasar();
-
-const viewMode = ref('cards');
-
-const patientQueue = ref([
-    { id: 1, patientName: 'นายสมศักดิ์ แข็งแรง', patientId: 'HN00123', doctorName: 'นพ. เก่งกาจ', status: 'รอจัดยา', medications: [{name: 'Amoxicillin 500mg'}, {name: 'Paracetamol 500mg'}, {name: 'Ibuprofen 400mg'}] },
-    { id: 2, patientName: 'นางสาวสมศรี สุขใจ', patientId: 'HN00456', doctorName: 'นพ. เก่งกาจ', status: 'กำลังรับยา', medications: [{name: 'Ibuprofen 400mg'}] },
-    { id: 3, patientName: 'เด็กชายมานะ อดทน', patientId: 'HN00789', doctorName: 'พญ. มีชัย', status: 'จัดยาแล้ว', medications: [{name: 'Saline Nasal Spray'}, {name: 'Antihistamine Syrup'}] },
-    { id: 4, patientName: 'นางสมบูรณ์ มั่งมี', patientId: 'HN00112', doctorName: 'พญ. มีชัย', status: 'รอจัดยา', medications: [{name: 'Amlodipine 5mg'}] },
-    { id: 5, patientName: 'นายวิชัย ใจสู้', patientId: 'HN00258', doctorName: 'นพ. เก่งกาจ', status: 'รอจัดยา', medications: [{name: 'Loratadine'}] },
-    { id: 6, patientName: 'นางสาวอารี ดีใจ', patientId: 'HN00369', doctorName: 'พญ. มีชัย', status: 'จัดยาแล้ว', medications: [{name: 'Vitamin C'}] },
-    { id: 7, patientName: 'นายองอาจ กล้าหาญ', patientId: 'HN00741', doctorName: 'นพ. เก่งกาจ', status: 'รอจัดยา', medications: [{name: 'Folic Acid'}] },
-]);
-
-const searchQuery = ref('');
-const statusFilter = ref(null);
-const currentPage = ref(1);
-const rowsPerPage = ref(6);
-
-const statusOptions = ref([{ label: 'ทุกสถานะ', value: null }, { label: 'รอจัดยา', value: 'รอจัดยา' }, { label: 'กำลังรับยา', value: 'กำลังรับยา' }, { label: 'จัดยาแล้ว', value: 'จัดยาแล้ว' }]);
-
-const columns = [
-    { name: 'patient', required: true, label: 'ชื่อ-นามสกุลผู้ป่วย', align: 'left', field: 'patientName', sortable: true, style: 'width: 30%' },
-    { name: 'medications', align: 'left', label: 'ยาที่สั่งโดยแพทย์', field: 'medications', format: val => val.map(med => med.name).join(', '), style: 'width: 30%;' },
-    { name: 'doctorName', align: 'left', label: 'แพทย์ผู้สั่ง', field: 'doctorName', sortable: true, style: 'width: 15%;' },
-    { name: 'status', align: 'center', label: 'สถานะ', field: 'status', sortable: true, style: 'width: 15%;' },
-    { name: 'actions', align: 'right', label: 'ดำเนินการ', style: 'width: 10%;' }
-];
-
-const filteredPatientQueue = computed(() => {
-    let data = patientQueue.value;
-    if (statusFilter.value) { data = data.filter(patient => patient.status === statusFilter.value); }
-    if (searchQuery.value) { const query = searchQuery.value.toLowerCase(); data = data.filter(patient => patient.patientName.toLowerCase().includes(query) || patient.patientId.toLowerCase().includes(query) || patient.medications.some(med => med.name.toLowerCase().includes(query))); }
-    return data;
-});
-
-const statusCounts = computed(() => {
-    const counts = { 'รอจัดยา': 0, 'กำลังรับยา': 0, 'จัดยาแล้ว': 0 };
-    for (const patient of patientQueue.value) {
-        if (patient.status in counts) {
-            counts[patient.status]++;
+// Fetch Active Dates
+const fetchActiveDates = async () => {
+    try {
+        const res = await axios.get('http://localhost:3000/api/pharmacist/active-dates')
+        if (Array.isArray(res.data)) {
+            activeDatesSet.value = new Set(res.data.map(d => date.formatDate(d, 'YYYY-MM-DD')))
         }
+    } catch (error) {
+        console.warn('Error fetching active dates:', error)
     }
-    return counts;
-});
-
-const statusFilterOptions = computed(() => {
-    return statusOptions.value.map(option => ({
-        ...option,
-        count: option.value === null
-            ? patientQueue.value.length
-            : (statusCounts.value[option.value] || 0)
-    }));
-});
-
-const maxPages = computed(() => {
-    return Math.ceil(filteredPatientQueue.value.length / rowsPerPage.value);
-});
-
-const paginatedQueue = computed(() => {
-    const startIndex = (currentPage.value - 1) * rowsPerPage.value;
-    const endIndex = startIndex + rowsPerPage.value;
-    return filteredPatientQueue.value.slice(startIndex, endIndex);
-});
-
-watch([() => searchQuery.value, () => statusFilter.value], () => {
-    currentPage.value = 1;
-});
-
-const getStatusColor = (status) => {
-  if (status === 'รอจัดยา') return 'deep-orange';
-  if (status === 'กำลังรับยา') return 'light-blue-7';
-  if (status === 'จัดยาแล้ว') return 'positive';
-  return 'grey';
-};
-
-const getStatusBorderClass = (status) => {
-    if (status === 'รอจัดยา') return 'border-orange';
-    if (status === 'กำลังรับยา') return 'border-blue';
-    if (status === 'จัดยาแล้ว') return 'border-green';
-    return 'border-grey';
-};
-
-const getStatusPillClass = (status) => {
-  if (statusFilter.value !== status) return '';
-  if (status === null) return 'active-primary';
-  const color = getStatusColor(status);
-  return `active-${color}`;
 }
+
+const checkCalendarEvent = (dateStr) => {
+    const formatted = dateStr.replace(/\//g, '-')
+    return activeDatesSet.value.has(formatted)
+}
+
+const generateDateOptions = () => {
+    const opts = []
+    const today = new Date()
+    for (let i = 0; i < 7; i++) {
+        const d = date.subtractFromDate(today, { days: i })
+        const dateVal = date.formatDate(d, 'YYYY-MM-DD')
+        const isRealData = activeDatesSet.value.has(dateVal);
+        let labelText = date.formatDate(d, 'D MMM YYYY', thaiDateLocale)
+        if (i === 0) labelText += ' (วันนี้)'
+        else if (i === 1) labelText += ' (เมื่อวาน)'
+        opts.push({
+            label: labelText, subLabel: isRealData ? 'คลิกเพื่อดูรายการ' : 'ไม่มีรายการบันทึก',
+            value: dateVal, hasData: isRealData
+        })
+    }
+    opts.push({ label: 'เลือกวันที่อื่น...', value: 'custom', hasData: false })
+    dateOptions.value = opts
+}
+
+const handleDateSelect = (val) => {
+    if (val === 'custom') {
+        tempSelectedDate.value = selectedDate.value
+        showCalendarDialog.value = true
+        nextTick(() => { })
+    } else {
+        manualRefresh() // กดเลือกวันใหม่ ให้โหลดแบบขึ้น Loading ปกติ
+    }
+}
+
+const confirmCalendarDate = () => {
+    if (!tempSelectedDate.value) return;
+    selectedDate.value = tempSelectedDate.value
+    showCalendarDialog.value = false
+
+    const exists = dateOptions.value.find(o => o.value === selectedDate.value)
+    if (!exists) {
+        const d = new Date(selectedDate.value)
+        const isRealData = activeDatesSet.value.has(selectedDate.value);
+        dateOptions.value.unshift({
+            label: date.formatDate(d, 'D MMM YYYY', thaiDateLocale) + ' (เลือกเอง)',
+            subLabel: 'จากการเลือกปฏิทิน',
+            value: selectedDate.value,
+            hasData: isRealData
+        })
+    }
+    manualRefresh()
+}
+
+const initializePage = async () => {
+    if (route.query.date) selectedDate.value = route.query.date;
+    else selectedDate.value = date.formatDate(new Date(), 'YYYY-MM-DD');
+
+    await fetchActiveDates();
+    generateDateOptions();
+    // โหลดครั้งแรก ให้แสดง Loading
+    loadQueue(false);
+}
+
+const mapStatusForPharmacist = (dbStatus) => {
+    if (dbStatus === 'กำลังรับยา') return 'กำลังรับยา';
+    if (dbStatus === 'รักษาเสร็จสิ้น') return 'รอรับยา';
+    if (dbStatus === 'จ่ายยาแล้ว') return 'จ่ายยาแล้ว';
+    return dbStatus || 'รอรับยา';
+}
+
+// 🔥 [แก้ไข] เพิ่ม Parameter isBackground = true (ค่าเริ่มต้นเป็น true ถ้าไม่ส่งมา)
+const loadQueue = async (isBackground = false) => {
+    if (!selectedDate.value || selectedDate.value === 'custom') return
+
+    // ถ้าไม่ใช่ Background load (เช่น กดปุ่ม, เลือกวันใหม่) ให้โชว์ Loading
+    if (!isBackground) loading.value = true
+
+    try {
+        const res = await axios.get('http://localhost:3000/api/pharmacist/queue', { params: { date: selectedDate.value } })
+        rawQueue.value = res.data.map(item => ({ ...item, status: mapStatusForPharmacist(item.status) }));
+    } catch (error) {
+        if (!isBackground) $q.notify({ type: 'negative', message: 'โหลดข้อมูลไม่สำเร็จ' })
+    } finally {
+        if (!isBackground) setTimeout(() => { loading.value = false; }, 600);
+    }
+}
+
+// ฟังก์ชันสำหรับปุ่ม Refresh (บังคับโชว์ Loading)
+const manualRefresh = () => {
+    loadQueue(false); // ส่ง false เพื่อบอกว่า "ไม่ใช่ background" -> ให้โชว์ Loading
+}
+
+const groupedQueue = computed(() => {
+    const groups = {}
+    rawQueue.value.forEach(visit => {
+        const pid = visit.patient_id
+        if (!groups[pid]) {
+            let finalAvatarUrl = null;
+            if (visit.avatarUrl || visit.avatar_url) {
+                 let cleanPath = (visit.avatarUrl || visit.avatar_url).replace(/\\/g, '/');
+                 if (cleanPath.includes('localhost:5000')) cleanPath = cleanPath.replace('localhost:5000', 'localhost:3000');
+                 if (cleanPath.startsWith('http')) finalAvatarUrl = cleanPath;
+                 else finalAvatarUrl = `http://localhost:3000${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+                 finalAvatarUrl += `?t=${Date.now()}`;
+            }
+            groups[pid] = { id: pid, patientId: pid, patientName: visit.patientName, avatarUrl: finalAvatarUrl, visits: [] }
+        }
+        groups[pid].visits.push(visit)
+    })
+    return Object.values(groups).map(p => {
+        const latestVisit = p.visits.reduce((prev, curr) => (new Date(curr.time) > new Date(prev.time) ? curr : prev), p.visits[0]);
+        const hasInProgress = p.visits.some(v => v.status === 'กำลังรับยา');
+        const hasPending = p.visits.some(v => v.status === 'รอรับยา');
+        let finalStatus = 'จ่ายยาแล้ว';
+        if (hasInProgress) finalStatus = 'กำลังรับยา'; else if (hasPending) finalStatus = 'รอรับยา';
+        const totalMeds = p.visits.reduce((sum, v) => sum + (v.prescriptionCount || 0), 0);
+        return { ...p, visit_id: latestVisit.visit_id, status: finalStatus, latestTime: latestVisit.time, totalPrescriptions: totalMeds }
+    })
+})
+
+const filteredQueue = computed(() => {
+    let data = groupedQueue.value
+    if (statusFilter.value) data = data.filter(p => p.status === statusFilter.value)
+    if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase()
+        data = data.filter(p => p.patientName.toLowerCase().includes(q) || p.patientId.toLowerCase().includes(q))
+    }
+    return data
+})
+
+const maxPages = computed(() => Math.ceil(filteredQueue.value.length / rowsPerPage.value))
+const paginatedPatients = computed(() => {
+    const start = (currentPage.value - 1) * rowsPerPage.value
+    return filteredQueue.value.slice(start, start + rowsPerPage.value)
+})
+
+const openDispenseHandler = (patient) => {
+    if (patient.visits.length > 1) { selectedPatient.value = patient; showVisitSelector.value = true; }
+    else { goToDispensePage(patient.visit_id) }
+}
+const goToDispensePage = (visitId) => { router.push({ name: 'PatientMedicine', params: { visitId }, query: { visitId } }) }
+const formatTime = (t) => { if (!t) return '-'; if (typeof t === 'string' && t.includes(':')) return t; const d = new Date(t); if (isNaN(d.getTime())) return '-'; return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; }
+
+const selectedDateLabel = computed(() => {
+    if (!selectedDate.value) return '-';
+    if (selectedDate.value === 'custom') return 'เลือกวันที่...';
+    const d = new Date(selectedDate.value);
+    if (isNaN(d.getTime())) return selectedDate.value;
+    return date.formatDate(d, 'D MMM YYYY', thaiDateLocale);
+})
 
 const getStatusChipClass = (status) => {
-  const baseClasses = 'text-weight-bold status-chip-display';
-  if (status === 'รอจัดยา') return `${baseClasses} status-chip-orange`;
-  if (status === 'กำลังรับยา') return `${baseClasses} status-chip-blue`;
-  if (status === 'จัดยาแล้ว') return `${baseClasses} status-chip-green`;
-  return `${baseClasses} status-chip-grey`;
-};
+    if (status === 'กำลังรับยา') return 'text-orange-3 bg-orange-9';
+    if (status === 'รอรับยา') return 'text-purple-3 bg-purple-9';
+    return 'text-green-3 bg-green-9';
+}
 
-const showAllMeds = (patient) => {
-    const medListHtml = patient.medications.map(med => `<li>${med.name}</li>`).join('');
-    $q.dialog({
-        dark: true,
-        cardClass: 'main-card',
-        title: `<div class="row items-center"><i class="q-icon on-left o_medication text-primary" style="font-size: 2em;"></i><span class="header-title">รายการยาทั้งหมดของ</span></div><div class="text-h6 header-title q-ml-xl">${patient.patientName}</div>`,
-        message: `<ul class="welcome-text" style="list-style-type: disc; padding-left: 20px;">${medListHtml}</ul>`,
-        html: true,
-        ok: { label: 'ตกลง', class: 'primary-action-btn' }
-    }).onOk(() => {
-        playClickSound();
-    });
-};
-
-const goToDispensing = (patientData) => {
-    router.push({ name: 'PatientMedicine', params: { id: patientData.id } });
-};
-
-const onRowClick = (evt, row) => {
-    goToDispensing(row);
-    playClickSound();
-};
+onMounted(() => {
+    initializePage();
+    // 🔥 [แก้ไข] ส่ง true เพื่อบอกว่าเป็น background polling (ไม่โชว์ loading overlay)
+    setInterval(() => loadQueue(true), 30000);
+})
 </script>
 
-<style scoped lang="scss">
-.dashboard-background {
-  background-color: #0d1a26;
-  font-family: 'Sarabun', sans-serif;
-  color: #e0e0e0;
-}
+<style lang="scss" scoped>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
 
-.header-icon {
-  color: #00d4ff;
-  text-shadow: 0 0 12px #00d4ff;
-}
+/* --- Theme Variables --- */
+$dark-bg: #0f172a;
+$glass-bg: rgba(30, 41, 59, 0.7);
+$glass-border: 1px solid rgba(255, 255, 255, 0.08);
+$accent-color: #14b8a6; /* Teal-500 */
 
-.header-title {
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(0, 184, 255, 0.8);
-}
+.status-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+.list-row-hover:hover { background: rgba(20, 184, 166, 0.15) !important; cursor: pointer; }
+.glass-btn { background: rgba(0,0,0,0.5) !important; backdrop-filter: blur(4px); }
+.bg-white-5 { background: rgba(255,255,255,0.05); }
 
-.welcome-text {
-  color: #90a4ae;
-}
-
-.primary-action-btn {
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-  border: 1px solid #00b8ff;
-  color: #00b8ff;
-  background: transparent;
-  border-radius: 8px;
-  transition: color 0.4s ease-in-out;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #00b8ff;
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    z-index: -1;
-  }
-
-  &:hover {
-    color: white;
-    &::before {
-      transform: scaleX(1);
+/* 🔥 CSS สำหรับ Popup รายการ Visit ใหม่ (สวย + ไม่มี Scroll มั่ว) */
+.visit-item-card {
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.2s;
+    &:hover {
+        background: rgba(20, 184, 166, 0.1);
+        border-color: rgba(20, 184, 166, 0.3);
+        transform: translateX(5px);
     }
-  }
 }
+.hover-rotate:hover { transform: rotate(90deg); transition: transform 0.3s; color: white !important; }
 
-.main-card {
-  background: linear-gradient(135deg, rgba(38, 50, 56, 0.5), rgba(38, 50, 56, 0.3));
-  background-size: 200% 200%;
-  background-position: 50% 50%;
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 184, 255, 0.2);
-  box-shadow: 0 4px 30px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(0, 184, 255, 0.1);
-  color: #e0e0e0;
-  transition: background-position 0.4s ease-out;
-}
-
-.interactive-card {
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-  &:hover {
-    transform: translateY(-6px) scale(1.02);
-    border-color: rgba(0, 184, 255, 0.5);
-    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
-    background-position: 100% 100%;
-  }
-}
-
-.status-pill {
-  background-color: rgba(144, 164, 174, 0.15);
-  color: #b0bec5;
-  transition: all 0.3s ease;
-  border: 1px solid rgba(144, 164, 174, 0.2);
-  padding: 4px 12px;
-  min-width: 130px;
-
-  &:hover {
-    background-color: rgba(144, 164, 174, 0.25);
-    border-color: rgba(144, 164, 174, 0.5);
-  }
-
-  &.active-primary {
-    color: white;
-    font-weight: 500;
-    background: #00b8ff;
-    box-shadow: 0 0 10px rgba(0, 184, 255, 0.7);
-    border-color: #00b8ff;
-  }
-  &.active-deep-orange {
-    color: white;
-    font-weight: 500;
-    background: #FF5722;
-    box-shadow: 0 0 10px #FF5722;
-    border-color: #FF5722;
-  }
-  &.active-light-blue-7 {
-    color: white;
-    font-weight: 500;
-    background: #039BE5;
-    box-shadow: 0 0 10px #039BE5;
-    border-color: #039BE5;
-  }
-  &.active-positive {
-    color: white;
-    font-weight: 500;
-    background: #26A69A;
-    box-shadow: 0 0 10px #26A69A;
-    border-color: #26A69A;
-  }
-}
-
-.patient-card {
-  cursor: pointer;
-  border-left-width: 5px;
-  border-left-style: solid;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.medication-container {
-  min-height: 95px;
-}
-
-.border-orange { border-left-color: #FF5722; }
-.border-blue { border-left-color: #039BE5; }
-.border-green { border-left-color: #26A69A; }
-.border-grey { border-left-color: #9E9E9E; }
-
-.no-data-card {
-  border: 2px dashed rgba(0, 184, 255, 0.2);
-}
-.placeholder-icon {
-  color: rgba(0, 184, 255, 0.3);
-}
-
-.themed-table {
-  background-color: rgba(38, 50, 56, 0.5);
-  backdrop-filter: blur(5px);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 184, 255, 0.2);
-}
-
-.themed-table :deep(.q-table__container) {
-  background: transparent !important;
-  border-radius: 12px;
-}
-
-.themed-table :deep(thead tr th) {
-  color: #ffffff;
-  background-color: rgba(0, 184, 255, 0.1);
-  border-bottom: 1px solid rgba(0, 184, 255, 0.2);
-  font-size: 0.85rem;
-  font-weight: bold;
-}
-
-.themed-table :deep(.table-row-item) {
-  cursor: pointer;
-  border-bottom: 1px solid rgba(0, 184, 255, 0.1);
-  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
-  &:last-child {
-    border-bottom: none;
-  }
-  &:hover {
-    background-color: rgba(0, 184, 255, 0.1) !important;
-    transform: scale(1.01);
-  }
-}
-
-.themed-table :deep(tbody td) {
-  vertical-align: middle;
-}
-
-.cell-content {
-  display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-.pagination-container {
-  background-color: rgba(38, 50, 56, 0.5);
-  backdrop-filter: blur(5px);
-  border-radius: 50px;
-  padding: 8px;
-  display: inline-block;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border: 1px solid rgba(0, 184, 255, 0.2);
-}
-
-:deep(.q-pagination .q-btn) {
-  border-radius: 50px !important;
-  background-color: transparent !important;
-  color: #00b8ff !important;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-:deep(.q-pagination .q-btn:not(.q-btn--active):hover) {
-  background-color: rgba(0, 184, 255, 0.1) !important;
-}
-:deep(.q-pagination .q-btn.q-btn--active) {
-  background-color: #00b8ff !important;
-  color: white !important;
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(0, 184, 255, 0.4);
-}
-
-.tooltip-glassy {
-  background: rgba(38, 50, 56, 0.8);
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(0, 184, 255, 0.2);
-  color: white;
-}
-
-.view-toggle {
-  border-radius: 8px;
-  border: 1px solid rgba(0, 184, 255, 0.3);
-}
-
-:deep(.q-field--outlined.q-field--dark .q-field__control) {
-  background-color: rgba(20, 38, 51, 0.7) !important;
-  border-color: rgba(0, 184, 255, 0.2) !important;
-  color: #e0e0e0 !important;
-  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
-}
-
-:deep(.q-field--outlined.q-field--dark .q-field__native) {
-  color: #e0e0e0 !important;
-}
-
-:deep(.q-field--outlined.q-field--dark .q-field__native::placeholder) {
-  color: #90a4ae !important;
-  opacity: 0.8;
-}
-
-:deep(.q-field--outlined.q-field--dark .q-field__prepend) {
-  color: #00b8ff !important;
-}
-
-:deep(.q-field--outlined.q-field--dark .q-field__control:hover) {
-  border-color: rgba(0, 184, 255, 0.5) !important;
-}
-
-:deep(.q-field--outlined.q-field--dark.q-field--focused .q-field__control) {
-  border-color: #00b8ff !important;
-  box-shadow: 0 0 10px rgba(0, 184, 255, 0.6) !important;
-}
-
-/* === START: STYLE EDIT === */
-.status-chip-display {
-  min-width: 100px;
-  border-radius: 8px;
-  font-weight: 500;
-  color: white;
-  transition: all 0.3s ease-in-out;
+.dashboard-background {
+  background-color: $dark-bg;
+  font-family: 'Sarabun', sans-serif;
+  color: #e2e8f0;
+  min-height: 100vh;
   position: relative;
-  overflow: hidden;
-
-  :deep(.q-chip__content) {
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-    position: relative;
-    z-index: 2;
-  }
-
+  overflow-x: hidden;
   &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 200%;
-    height: 100%;
-    background: linear-gradient(
-      110deg,
-      transparent 40%,
-      rgba(255, 255, 255, 0.25) 50%,
-      transparent 60%
-    );
-    transform: translateX(-100%);
-    transition: transform 0s;
+    content: ''; position: absolute; top: -20%; right: -10%; width: 50%; height: 50%;
+    background: radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, transparent 60%);
+    filter: blur(80px); pointer-events: none;
   }
 }
 
-.status-chip-orange {
-  background-color: #FF5722;
-  border: 1px solid #FF5722;
-}
-.status-chip-blue {
-  background-color: #039BE5;
-  border: 1px solid #039BE5;
-}
-.status-chip-green {
-  background-color: #26A69A;
-  border: 1px solid #26A69A;
-}
-.status-chip-grey {
-  background-color: #455a64;
-  border-color: #78909c;
+/* 🔥🔥🔥 แก้ไขตรงนี้ครับ 🔥🔥🔥
+   กำหนดขนาดสูงสุด (max-width) และใช้ margin: auto เพื่อจัดกลาง
+*/
+.content-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1440px; /* กำหนดความกว้างที่ต้องการ (เช่น 1200px หรือ 1440px) */
+  margin-left: auto; /* ดันขอบซ้าย */
+  margin-right: auto; /* ดันขอบขวา */
 }
 
-.patient-card:hover .status-chip-display::before,
-.table-row-item:hover .status-chip-display::before {
-  transform: translateX(100%);
-  transition: transform 0.8s ease-in-out;
+/* Components */
+.glass-panel {
+  background: $glass-bg; backdrop-filter: blur(12px); border: $glass-border;
+  border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.patient-card:hover .status-chip-display,
-.table-row-item:hover .status-chip-display {
-  transform: scale(1.05);
+.icon-box-flat {
+  width: 48px; height: 48px; background: linear-gradient(135deg, $accent-color, #0d9488);
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
 }
-/* === END: STYLE EDIT === */
-
-</style>
-
-<style lang="scss">
-.list-item-animation {
-  opacity: 0;
-  animation: floatUp 0.6s ease-out forwards;
+.action-btn-flat {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  color: white; font-weight: 600; transition: transform 0.2s;
+  &:hover { transform: translateY(-2px); }
 }
+.search-input {
+  :deep(.q-field__control) { background: rgba(0,0,0,0.3) !important; border-radius: 50px; border: 1px solid rgba(255,255,255,0.1); }
+  :deep(.q-field__control:hover) { border-color: $accent-color; }
+}
+.glass-menu { background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: $glass-border; }
 
-@keyframes floatUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+/* Patient Card */
+.patient-card {
+  height: 100%; cursor: pointer; display: flex; flex-direction: column; border-left: 3px solid transparent;
+  &:hover {
+    border-left-color: $accent-color; transform: translateY(-5px) scale(1.01);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.4); .zoom-overlay { opacity: 1; }
   }
 }
+.card-content { padding: 20px; }
+.avatar-container-outer { position: relative; display: inline-block; }
+.avatar-wrapper { position: relative; cursor: pointer; border-radius: 50%; overflow: hidden; width: 64px; height: 64px; }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+.zoom-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(20, 184, 166, 0.6); display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.3s; border-radius: 50%;
+}
+.avatar-wrapper:hover .avatar-img { transform: scale(1.1); }
+.new-badge-absolute { font-size: 10px; padding: 2px 6px; border: 1px solid rgba(255,255,255,0.2); }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.info-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; }
+
+/* List View */
+.list-view-container { margin-top: 10px; }
+.list-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 10px; opacity: 0.7; }
+.list-row {
+  transition: all 0.2s ease-in-out; border: 1px solid transparent;
+  &:hover { background: rgba(255,255,255,0.08); border-color: rgba(20, 184, 166, 0.3); transform: translateX(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+}
+.avatar-wrapper-mini { position: relative; cursor: zoom-in; transition: transform 0.2s; &:hover { transform: scale(1.15); z-index: 10; } }
+.mini-new-badge { font-size: 8px; padding: 2px 4px; top: 0; right: -5px; }
+.hover-icon { transition: color 0.2s; &:hover { color: #fff !important; } }
+.glass-chip { background: rgba(255,255,255,0.1); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
+
+/* Loading */
+.loading-overlay { position: fixed; inset: 0; background: $dark-bg; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.loading-spinner { width: 50px; height: 50px; border: 3px solid rgba(20, 184, 166, 0.3); border-top-color: $accent-color; border-radius: 50%; animation: spin 1s linear infinite; }
+.loading-text { font-family: 'Sarabun'; letter-spacing: 1px; color: $accent-color; animation: pulse 1.5s infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: 0.5; } }
+@keyframes fadeInSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.list-item-animation { opacity: 0; animation: fadeInSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.font-mono { font-family: monospace; }
+.opacity-20 { opacity: 0.2; }
 </style>

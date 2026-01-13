@@ -1,21 +1,23 @@
-// src/db/sequelize.ts
 import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
 
-dotenv.config();
+// 1. กำหนด Environment (ถ้าไม่บอก ให้ถือว่าเป็น development)
+const env = process.env.NODE_ENV || 'development';
 
-const { DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT } = process.env;
+// 2. ดึงค่า Config จากไฟล์ config.json ที่เราแก้ไปแล้ว
+// (ย้อนกลับไป 2 โฟลเดอร์: src/db -> src -> backend -> config)
+const config = require('../../config/config.json')[env];
 
-if (!DATABASE_NAME || !DATABASE_USER || !DATABASE_HOST) {
-  throw new Error('Please define DATABASE_NAME, DATABASE_USER, and DATABASE_HOST in your .env file');
-}
-
-// สร้างและ export instance ของ Sequelize ที่นี่
-const sequelize = new Sequelize(DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD || '', {
-  host: DATABASE_HOST,
-  port: Number(DATABASE_PORT) || 3306,
-  dialect: 'mysql',
-  logging: false
-});
+// 3. สร้าง Instance โดยใช้ค่าจาก config.json (ที่มีรหัสผ่าน root)
+const sequelize = new Sequelize(
+  config.database,
+  config.username,
+  config.password,
+  {
+    host: config.host,
+    dialect: config.dialect, // 'mysql'
+    logging: config.logging, // false
+    port: 3306
+  }
+);
 
 export default sequelize;

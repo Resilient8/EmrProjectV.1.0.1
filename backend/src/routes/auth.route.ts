@@ -1,16 +1,13 @@
-// ในไฟล์ src/routes/auth.route.ts
 import { Router } from 'express';
-// ชื่อฟังก์ชันอาจเป็น registerUser หรือ signup ก็ได้ ขึ้นอยู่กับไฟล์ controller ของคุณ
-import { registerUser, loginUser } from '../controller/authController';
+// 🔥 แก้ชื่อ Import ให้ตรงกับ Controller (register, login)
+import { register, login } from '../controller/authController';
 
 const router = Router();
 
-// --- แก้ไขบรรทัดนี้ ---
-// เปลี่ยนจาก '/register' เป็น '/signup'
-router.post('/signup', registerUser);
-// --------------------
+// ✅ ใช้ '/register' เพื่อให้ตรงกับ Frontend ที่เราเขียนไว้
+router.post('/register', register);
 
-// กำหนดเส้นทางสำหรับ Login
-router.post('/login', loginUser);
+// ✅ Login
+router.post('/login', login);
 
 export default router;

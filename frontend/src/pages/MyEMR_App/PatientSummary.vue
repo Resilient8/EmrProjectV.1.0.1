@@ -1,658 +1,701 @@
 <template>
-  <div class="summary-grid">
-    <div class="left-column">
-      <q-card class="main-card profile-card list-item-animation" flat style="animation-delay: 0.1s;">
-        <div class="profile-card-header">
-          <q-avatar size="90px" color="primary" text-color="white" icon="o_person" class="profile-avatar" />
-          <div class="text-h5 q-mt-md text-weight-bold header-title">{{ patientData.firstName }} {{ patientData.lastName }}</div>
-          <div class="text-subtitle1 welcome-text">HN: {{ patientData.patientId }}</div>
+  <q-page class="rounded-page-wrapper">
+
+    <div class="fixed-layout">
+
+      <q-inner-loading :showing="loading" dark label="กำลังโหลดข้อมูล..." label-class="text-cyan-3">
+        <q-spinner-dots color="cyan-3" size="60px" />
+      </q-inner-loading>
+
+      <div class="external-header">
+        <q-btn
+          class="back-button-glassy"
+          no-caps rounded unelevated
+          icon="arrow_back_ios_new"
+          label="ย้อนกลับ"
+          @click="() => router.go(-1)"
+        />
+
+        <div class="glassy-tab-group">
+          <q-btn
+            v-for="tab in ['summary', 'vitals', 'symptoms', 'treatment', 'medication']"
+            :key="tab"
+            class="tab-button-glassy"
+            :class="{ 'is-active': currentMainTab === tab }"
+            no-caps rounded unelevated
+            :label="getTabLabel(tab)"
+            @click="() => { currentMainTab = tab; playClickSound(); }"
+          />
         </div>
-        <q-list class="profile-details-list" separator>
-          <q-item>
-            <q-item-section avatar><q-icon name="o_cake" color="primary" /></q-item-section>
-            <q-item-section>
-              <q-item-label caption>อายุ (วันเกิด)</q-item-label>
-              <q-item-label>{{ patientData.age }} ปี ({{ formatDate(patientData.birthDate) }})</q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-item>
-            <q-item-section avatar><q-icon name="o_bloodtype" color="primary" /></q-item-section>
-            <q-item-section>
-              <q-item-label caption>กรุ๊ปเลือด</q-item-label>
-              <q-item-label>{{ patientData.bloodGroup || 'ไม่ระบุ' }}</q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-item>
-            <q-item-section avatar><q-icon name="o_home" color="primary" /></q-item-section>
-            <q-item-section>
-              <q-item-label caption>ที่อยู่</q-item-label>
-              <q-item-label class="ellipsis-2-lines">{{ patientData.address || 'ไม่ระบุ' }}</q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-item v-if="patientData.allergies && patientData.allergies !== 'ไม่มี'">
-            <q-item-section avatar><q-icon name="o_warning" color="negative" /></q-item-section>
-            <q-item-section>
-              <q-item-label caption class="text-negative">ประวัติการแพ้ยา</q-item-label>
-              <q-item-label class="text-negative text-weight-bold">{{ patientData.allergies }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </q-card>
-
-      <q-card class="main-card history-card list-item-animation" flat style="animation-delay: 0.2s;">
-        <q-toolbar class="main-card-header">
-          <q-toolbar-title class="text-h6 text-weight-bold header-title">ประวัติการรักษา</q-toolbar-title>
-        </q-toolbar>
-        <q-list separator class="themed-list">
-          <q-item
-            v-for="visit in treatmentHistory"
-            :key="visit.id"
-            clickable v-ripple
-            :active="currentVisit.id === visit.id"
-            active-class="active-visit-item"
-            @click="() => { currentVisit = visit; playClickSound(); }"
-          >
-            <q-item-section>
-              <q-item-label class="text-weight-medium">{{ visit.mainDiagnosis }}</q-item-label>
-              <q-item-label caption class="welcome-text">{{ formatDate(visit.visitDate) }}</q-item-label>
-            </q-item-section>
-            <q-item-section side><q-icon name="o_chevron_right" :color="currentVisit.id === visit.id ? 'white' : 'primary'"/></q-item-section>
-          </q-item>
-        </q-list>
-      </q-card>
-    </div>
-
-    <div class="right-column">
-      <div class="list-item-animation" style="animation-delay: 0.3s;">
-          <div class="row q-col-gutter-md">
-            <div v-for="stat in currentVisit.vitalSigns" :key="stat.label" class="col-6 col-md-4">
-              <q-card class="stat-card main-card interactive-card" flat @click="() => { showHistoryChart(stat.label); playClickSound(); }">
-                <q-card-section class="stat-card-section">
-                  <div class="stat-content">
-                    <div class="text-caption welcome-text">{{ stat.label }}</div>
-                    <div class="text-h5 text-weight-bolder">
-                      <span :class="getVitalSignColorClass(stat.label, stat.value, patientData.gender)">{{ stat.value }}</span>
-                      <span class="text-body2 text-weight-regular q-ml-xs welcome-text">{{ stat.unit }}</span>
-                    </div>
-                    <div class="text-caption welcome-text">ค่าปกติ: {{ stat.ref }}</div>
-                  </div>
-                  <q-icon :name="stat.icon" :color="stat.color" size="2.5em" class="stat-icon" />
-                </q-card-section>
-                <q-tooltip class="tooltip-glassy">คลิกเพื่อดูกราฟย้อนหลัง</q-tooltip>
-              </q-card>
-            </div>
-          </div>
       </div>
 
-      <q-card class="main-card timeline-card list-item-animation" flat style="animation-delay: 0.4s;">
-        <q-toolbar class="main-card-header">
-          <q-toolbar-title class="text-h6 text-weight-bold header-title">บันทึกการรักษา - {{ formatDate(currentVisit.visitDate) }}</q-toolbar-title>
-          <q-btn flat round dense icon="o_print" @click="() => { printVisit(); playClickSound(); }" text-color="welcome-text">
-            <q-tooltip class="tooltip-glassy">พิมพ์ใบสรุป</q-tooltip>
-          </q-btn>
-        </q-toolbar>
-        <q-card-section class="timeline-scroll-area">
-          <div class="elegant-timeline-container">
+      <div v-if="!loading && patientData.patientId" class="layout-container-wrapper">
+        <div class="layout-container">
 
-            <div class="elegant-timeline-section">
-              <div class="elegant-section-header">
-                <q-icon name="o_healing" class="elegant-header-icon"/>
-                <span class="text-h6 text-weight-bold">อาการและการซักประวัติ</span>
+          <div class="global-top-bar">
+            <div class="patient-info-wrapper clickable" @click="openProfileDialog">
+              <div class="avatar-ring">
+                <q-avatar size="42px">
+                  <img v-if="patientData.avatarUrl" :src="patientData.avatarUrl" style="object-fit: cover;">
+                  <q-icon v-else :name="patientData.sex === 'ชาย' ? 'face' : 'face_3'" :color="patientData.sex === 'ชาย' ? 'blue-2' : 'pink-2'" />
+                </q-avatar>
               </div>
-              <div class="elegant-section-content">
-                <div class="elegant-timeline-card" @click="showDetailDialog({
-                  icon: 'o_sick',
-                  title: 'อาการสำคัญ (Chief Complaint)',
-                  content: currentVisit.symptoms.chiefComplaint
-                })">
-                  <div class="item-icon-wrapper"><q-icon name="o_sick" class="item-icon"/></div>
-                  <div class="item-content-wrapper">
-                    <div class="item-title">อาการสำคัญ (Chief Complaint)</div>
-                    <div class="item-description">{{ currentVisit.symptoms.chiefComplaint || 'ไม่ระบุ' }}</div>
-                  </div>
+              <div class="q-ml-md">
+                <div class="text-subtitle1 text-white leading-tight text-weight-bold">{{ patientData.firstName }} {{ patientData.lastName }}</div>
+                <div class="text-caption text-cyan-3">HN: {{ patientData.patientId }}</div>
+              </div>
+              <q-separator vertical dark spaced class="opacity-20 q-mx-lg gt-xs" />
+
+              <div class="row items-center q-gutter-x-md gt-xs">
+                <div class="row items-center"><q-icon name="cake" color="grey-5" class="q-mr-sm" /><span class="text-white">{{ patientData.age }} ปี</span></div>
+                <div class="row items-center"><q-icon name="bloodtype" color="red-4" class="q-mr-sm" /><span class="text-white">{{ patientData.bloodGroup || '-' }}</span></div>
+              </div>
+
+              <q-space />
+
+              <div class="row q-gutter-x-sm items-center">
+                <div v-if="patientData.allergies && patientData.allergies !== 'ไม่มี'" class="alert-badge drug">
+                  <q-icon name="warning" size="xs" />
+                  <span class="badge-text">{{ patientData.allergies }}</span>
+                  <q-tooltip>แพ้ยา: {{ patientData.allergies }}</q-tooltip>
                 </div>
-                <div class="elegant-timeline-card" @click="showDetailDialog({
-                  icon: 'o_history',
-                  title: 'ประวัติการเจ็บป่วยปัจจุบัน (Present Illness)',
-                  content: currentVisit.symptoms.presentIllness
-                })">
-                  <div class="item-icon-wrapper"><q-icon name="o_history" class="item-icon"/></div>
-                  <div class="item-content-wrapper">
-                    <div class="item-title">ประวัติการเจ็บป่วยปัจจุบัน (Present Illness)</div>
-                    <div class="item-description">{{ currentVisit.symptoms.presentIllness || 'ไม่ระบุ' }}</div>
-                  </div>
+                <div v-if="patientData.foodAllergies && patientData.foodAllergies !== 'ไม่มี'" class="alert-badge food gt-sm">
+                  <q-icon name="restaurant" size="xs" />
+                  <span class="badge-text">{{ patientData.foodAllergies }}</span>
+                  <q-tooltip>แพ้อาหาร: {{ patientData.foodAllergies }}</q-tooltip>
+                </div>
+                <div v-if="patientData.underlyingDisease && patientData.underlyingDisease !== 'ไม่มี'" class="alert-badge disease gt-sm">
+                  <q-icon name="monitor_heart" size="xs" />
+                  <span class="badge-text">{{ patientData.underlyingDisease }}</span>
+                  <q-tooltip>โรคประจำตัว: {{ patientData.underlyingDisease }}</q-tooltip>
                 </div>
               </div>
+              <q-tooltip class="bg-black border-cyan">คลิกเพื่อดูข้อมูลส่วนตัว</q-tooltip>
             </div>
-
-            <div class="elegant-timeline-section">
-              <div class="elegant-section-header">
-                <q-icon name="o_medical_information" class="elegant-header-icon"/>
-                <span class="text-h6 text-weight-bold">การวินิจฉัยและการรักษา</span>
-              </div>
-              <div class="elegant-section-content">
-                <div class="elegant-timeline-card highlight-diagnosis" @click="showDetailDialog({
-                  icon: 'o_medical_services',
-                  title: 'การวินิจฉัยหลัก (Main Diagnosis)',
-                  content: currentVisit.mainDiagnosis,
-                  isHighlight: true
-                })">
-                  <div class="item-icon-wrapper"><q-icon name="o_medical_services" class="item-icon highlight"/></div>
-                  <div class="item-content-wrapper">
-                    <div class="item-title">การวินิจฉัยหลัก (Main Diagnosis)</div>
-                    <div class="item-description text-h6 text-positive text-weight-bold">{{ currentVisit.mainDiagnosis || 'ไม่ระบุ' }}</div>
-                  </div>
-                </div>
-
-                <div v-if="currentVisit.procedures && currentVisit.procedures.length > 0" class="elegant-timeline-card" @click="showDetailDialog({
-                  icon: 'o_list_alt',
-                  title: 'รายการบริการและหัตถการ',
-                  content: currentVisit.procedures,
-                  type: 'procedures'
-                })">
-                  <div class="item-icon-wrapper"><q-icon name="o_list_alt" class="item-icon"/></div>
-                  <div class="item-content-wrapper">
-                    <div class="item-title">รายการบริการและหัตถการ</div>
-                    <q-list dense separator class="elegant-info-list preview-list">
-                      <q-item v-for="(proc, index) in currentVisit.procedures" :key="index">
-                        <q-item-section>
-                          <q-item-label>{{ proc.service }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </div>
-                </div>
-
-                <div v-if="currentVisit.medications && currentVisit.medications.length > 0" class="elegant-timeline-card" @click="showDetailDialog({
-                  icon: 'o_medication_liquid',
-                  title: 'ยาที่ได้รับ (Prescription)',
-                  content: currentVisit.medications,
-                  type: 'medications'
-                })">
-                  <div class="item-icon-wrapper"><q-icon name="o_medication_liquid" class="item-icon"/></div>
-                  <div class="item-content-wrapper">
-                    <div class="item-title">ยาที่ได้รับ (Prescription)</div>
-                    <q-list dense separator class="elegant-info-list preview-list">
-                      <q-item v-for="(med, index) in currentVisit.medications" :key="index">
-                        <q-item-section>
-                          <q-item-label>{{ med.name }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </div>
-        </q-card-section>
-      </q-card>
+
+          <div class="content-grid">
+            <div class="left-panel">
+              <div class="panel-header">
+                <div class="text-subtitle1 text-white text-weight-bold"><q-icon name="history" class="q-mr-sm text-cyan-3"/>ประวัติการรักษา</div>
+                <q-btn-dropdown flat dense round dropdown-icon="sort" color="grey-5">
+                  <q-list class="bg-dark text-white">
+                    <q-item clickable v-close-popup @click="sortOrder = 'desc'"><q-item-section>ใหม่ -> เก่า</q-item-section></q-item>
+                    <q-item clickable v-close-popup @click="sortOrder = 'asc'"><q-item-section>เก่า -> ใหม่</q-item-section></q-item>
+                  </q-list>
+                </q-btn-dropdown>
+              </div>
+              <q-scroll-area class="fit" :thumb-style="{ width: '4px', borderRadius: '5px', background: '#22d3ee' }">
+                <q-list class="history-list">
+                  <q-item
+                    v-for="visit in sortedTreatmentHistory" :key="visit.id"
+                    clickable v-ripple
+                    class="history-item"
+                    :class="{ 'is-active': currentVisit && currentVisit.id === visit.id }"
+                    @click="() => { currentVisit = visit; playClickSound(); }"
+                  >
+                    <div class="indicator-bar"></div>
+                    <q-item-section>
+                      <div class="text-weight-bold text-white ellipsis">{{ visit.mainDiagnosis }}</div>
+                      <div class="text-caption text-grey-5">{{ formatDate(visit.visitDate) }}</div>
+                    </q-item-section>
+                    <q-item-section side><q-icon name="chevron_right" size="xs" color="grey-6" /></q-item-section>
+                  </q-item>
+                </q-list>
+              </q-scroll-area>
+            </div>
+
+            <div class="right-panel">
+              <div class="content-frame-wrapper">
+                <transition name="fade" mode="out-in">
+                  <q-card v-if="currentVisit" class="detail-card bg-transparent shadow-none" flat key="content">
+                    <q-tab-panels v-model="currentMainTab" animated class="bg-transparent fit">
+
+                      <q-tab-panel name="summary" class="q-pa-lg scroll">
+                        <div class="text-h6 text-white q-mb-md flex items-center">
+                          <q-icon name="dashboard" class="q-mr-sm text-yellow-4"/>สรุปการรักษา
+                        </div>
+
+                        <div class="row q-col-gutter-md q-mb-md">
+                          <div class="col-12 col-md-8">
+                            <div class="info-box h-full">
+                               <div class="box-label text-cyan-3">การวินิจฉัยหลัก</div>
+                               <div class="text-h4 text-weight-bold text-white q-mb-sm">{{ currentVisit.mainDiagnosis || '-' }}</div>
+                               <div class="text-grey-4 text-subtitle2">
+                                 <q-icon name="sick" class="q-mr-xs"/> อาการ: <span class="text-white">{{ currentVisit.symptoms.chiefComplaint }}</span>
+                               </div>
+                            </div>
+                          </div>
+                          <div class="col-12 col-md-4">
+                             <div class="info-box h-full flex column justify-center items-center text-center">
+                                <div class="text-caption text-grey-5">วันที่เข้ารับการรักษา</div>
+                                <div class="text-h5 text-white text-weight-bold">{{ formatDate(currentVisit.visitDate) }}</div>
+                             </div>
+                          </div>
+                        </div>
+
+                        <q-separator dark class="q-my-md opacity-20" />
+
+                        <div class="text-subtitle1 text-white q-mb-sm">สัญญาณชีพเบื้องต้น</div>
+                        <div class="row q-col-gutter-sm q-mb-md">
+                           <div v-for="stat in currentVisit.vitalSigns.slice(0, 4)" :key="stat.label" class="col-6 col-md-3">
+                              <div class="mini-vital-card">
+                                 <q-icon :name="stat.icon" :color="stat.color" size="sm"/>
+                                 <div>
+                                   <div class="text-caption text-grey-5">{{ stat.label }}</div>
+                                   <div class="text-weight-bold text-white">{{ stat.value }} <span style="font-size: 0.7em">{{ stat.unit }}</span></div>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+
+                        <div class="text-subtitle1 text-white q-mb-sm">รายการยาที่ได้รับ</div>
+                         <div v-if="currentVisit.prescriptions && currentVisit.prescriptions.length > 0">
+                            <div class="row q-col-gutter-sm">
+                              <div v-for="(med, idx) in currentVisit.prescriptions" :key="idx" class="col-12 col-sm-6">
+                                <div class="med-capsule">
+                                  <q-icon name="pill" color="teal-3" class="q-mr-sm"/>
+                                  <div class="ellipsis">{{ med.name }}</div>
+                                  <q-space/>
+                                  <div class="badge-qty">x{{ med.qty }}</div>
+                                </div>
+                              </div>
+                            </div>
+                         </div>
+                         <div v-else class="text-grey-6 text-body2">ไม่มีการสั่งยา</div>
+                      </q-tab-panel>
+
+
+                      <q-tab-panel name="vitals" class="q-pa-lg scroll">
+                        <div class="text-h6 text-white q-mb-md"><q-icon name="monitor_heart" class="q-mr-sm text-pink-4"/>สัญญาณชีพ</div>
+                        <div class="vitals-grid">
+                          <div v-for="stat in currentVisit.vitalSigns" :key="stat.label" class="vital-card">
+                            <div class="vital-icon" :style="{ backgroundColor: `rgba(${getColorRGB(stat.color)}, 0.1)`, color: stat.color }">
+                              <q-icon :name="stat.icon" />
+                            </div>
+                            <div class="vital-info">
+                              <div class="vital-label">{{ stat.label }}</div>
+                              <div class="vital-value">
+                                {{ stat.value }} <span class="unit">{{ stat.unit }}</span>
+                              </div>
+                              <div class="vital-ref">ปกติ: {{ stat.ref }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </q-tab-panel>
+
+
+                      <q-tab-panel name="symptoms" class="q-pa-lg scroll">
+                        <div class="text-h6 text-white q-mb-md"><q-icon name="sick" class="q-mr-sm text-orange-4"/>อาการ</div>
+
+                        <div class="info-box q-mb-md">
+                          <div class="box-label text-orange-3">อาการสำคัญ (CC)</div>
+                          <div class="box-content">{{ currentVisit.symptoms.chiefComplaint || '-' }}</div>
+                        </div>
+
+                        <div class="info-box q-mb-md">
+                          <div class="box-label text-blue-3">ประวัติปัจจุบัน (PI)</div>
+                          <div class="box-content text-grey-4">{{ currentVisit.symptoms.presentIllness || '-' }}</div>
+                        </div>
+
+                        <div v-if="currentVisit.symptoms.ros && currentVisit.symptoms.ros.length > 0">
+                          <q-separator dark class="q-my-md opacity-20" />
+                          <div class="text-subtitle1 text-white q-mb-sm flex items-center">
+                            <q-icon name="assignment" class="q-mr-sm text-cyan-3"/>
+                            การซักประวัติเพิ่มเติมตามระบบ (ROS)
+                          </div>
+
+                          <div class="row q-col-gutter-md">
+                            <div v-for="(item, index) in currentVisit.symptoms.ros" :key="index" class="col-12 col-sm-6">
+                              <div class="ros-box h-full">
+                                <div class="ros-header">
+                                  <div class="box-label text-cyan-3 no-margin">{{ item.label }}</div>
+                                </div>
+                                <div class="ros-content">
+                                  <div v-if="parseRosItems(item.value).length > 0" class="capsule-wrapper">
+                                    <div
+                                      v-for="(symptom, sIndex) in parseRosItems(item.value).slice(0, 5)"
+                                      :key="sIndex"
+                                      class="ros-capsule"
+                                    >
+                                      {{ symptom }}
+                                    </div>
+                                    <div v-if="parseRosItems(item.value).length > 5" class="ros-capsule more">
+                                      <q-tooltip>มีอีก {{ parseRosItems(item.value).length - 5 }} รายการ</q-tooltip>
+                                      +{{ parseRosItems(item.value).length - 5 }}
+                                    </div>
+                                  </div>
+                                  <div v-else class="text-grey-6 text-caption">-</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </q-tab-panel>
+
+
+                      <q-tab-panel name="treatment" class="q-pa-lg scroll">
+                        <div class="text-h6 text-white q-mb-md"><q-icon name="medical_services" class="q-mr-sm text-green-4"/>การรักษา</div>
+
+                        <div class="diagnosis-box q-mb-lg">
+                          <div class="box-label text-cyan-3">การวินิจฉัยหลัก</div>
+                          <div class="diagnosis-text">{{ currentVisit.mainDiagnosis || '-' }}</div>
+                        </div>
+
+                        <div v-if="currentVisit.procedures && currentVisit.procedures.length > 0" class="q-mb-lg">
+                          <div class="text-subtitle2 text-grey-5 q-mb-sm">บริการและหัตถการ</div>
+                          <div class="procedures-list">
+                            <div v-for="(proc, index) in currentVisit.procedures" :key="index" class="procedure-item">
+                              <q-icon name="check_circle" color="green-5" class="q-mr-sm" />
+                              {{ proc.service }}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div v-if="currentVisit.prescriptions && currentVisit.prescriptions.length > 0">
+                           <div class="text-subtitle2 text-grey-5 q-mb-sm">ยาที่แพทย์สั่ง (Doctor's Orders)</div>
+                           <div class="procedures-list">
+                            <div v-for="(med, idx) in currentVisit.prescriptions" :key="idx" class="procedure-item" style="border-left: 3px solid #20b8a6;">
+                              <q-icon name="medication" color="teal-4" class="q-mr-sm" />
+                              <div class="column">
+                                <div class="text-white">{{ med.name }} <span class="text-teal-3 text-caption">(x{{ med.qty }})</span></div>
+                                <div class="text-grey-5 text-caption">{{ med.usage }}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </q-tab-panel>
+
+
+                      <q-tab-panel name="medication" class="q-pa-lg scroll">
+                         <div class="text-h6 text-white q-mb-md"><q-icon name="vaccines" class="q-mr-sm text-teal-4"/>ยาและเวชภัณฑ์</div>
+
+                         <div v-if="currentVisit.prescriptions && currentVisit.prescriptions.length > 0" class="row q-col-gutter-md">
+                            <div v-for="(med, idx) in currentVisit.prescriptions" :key="idx" class="col-12 col-md-6">
+                               <div class="med-card">
+                                  <div class="med-icon">
+                                    <q-icon name="pill" />
+                                  </div>
+                                  <div class="med-info">
+                                     <div class="med-name">{{ med.name }}</div>
+                                     <div class="med-usage">
+                                        <q-icon name="info" size="xs" class="q-mr-xs"/>
+                                        {{ med.usage || 'ไม่ระบุวิธีใช้' }}
+                                     </div>
+                                  </div>
+                                  <div class="med-qty">
+                                     <div class="qty-val">{{ med.qty }}</div>
+                                     <div class="qty-unit">QTY</div>
+                                  </div>
+                               </div>
+                            </div>
+                         </div>
+
+                         <div v-else class="empty-state-small">
+                            <q-icon name="no_drugs" size="50px" color="grey-7"/>
+                            <div class="text-grey-6 q-mt-sm">ไม่มีรายการยาในครั้งนี้</div>
+                         </div>
+                      </q-tab-panel>
+
+                    </q-tab-panels>
+                  </q-card>
+
+                  <div v-else class="empty-state" key="empty">
+                    <q-icon name="manage_search" size="80px" color="grey-8" />
+                    <div class="text-h6 text-grey-6 q-mt-md">เลือกรายการทางซ้ายเพื่อดูรายละเอียด</div>
+                  </div>
+                </transition>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <q-dialog v-model="isChartDialogVisible">
-      <q-card style="width: 700px; max-width: 80vw;" class="main-card">
+    <q-dialog v-model="isProfileDialogVisible" backdrop-filter="blur(8px)">
+      <q-card class="profile-dialog">
+        <q-btn icon="close" flat round dense v-close-popup class="close-btn" />
+        <q-card-section class="q-pa-lg">
+          <div class="row no-wrap items-center">
+            <div class="col">
+              <div class="text-overline text-cyan-3">PATIENT PROFILE</div>
+              <div class="text-h5 text-white text-weight-bold q-mb-xs">{{ patientData.title }} {{ patientData.firstName }} {{ patientData.lastName }}</div>
+              <div class="text-subtitle1 text-grey-5">HN: <span class="text-white">{{ patientData.patientId }}</span></div>
+            </div>
+            <div class="avatar-edit-wrapper relative-position q-ml-md">
+              <div class="avatar-zoom-wrapper" @click="isAvatarViewerVisible = true">
+                <q-avatar size="110px" class="profile-avatar">
+                  <img v-if="patientData.avatarUrl" :src="patientData.avatarUrl" style="object-fit: cover; width: 100%; height: 100%;">
+                  <q-icon v-else :name="patientData.sex === 'ชาย' ? 'face' : 'face_3'" :color="patientData.sex === 'ชาย' ? 'blue-2' : 'pink-2'" />
+                </q-avatar>
+              </div>
+              <q-btn round size="sm" color="cyan-3" text-color="dark" icon="edit" class="absolute-bottom-right shadow-5 edit-btn" @click="triggerFileSelect">
+                <q-tooltip>เปลี่ยนรูปโปรไฟล์</q-tooltip>
+              </q-btn>
+              <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
+            </div>
+          </div>
+          <q-separator dark class="q-my-lg opacity-10" />
+          <div class="stats-grid">
+            <div class="stat-box"><div class="label">อายุ</div><div class="value">{{ patientData.age }} <span class="unit">ปี</span></div></div>
+            <div class="stat-box"><div class="label">กรุ๊ปเลือด</div><div class="value text-red-4">{{ patientData.bloodGroup || '-' }}</div></div>
+            <div class="stat-box wide"><div class="label">ที่อยู่</div><div class="value small">{{ patientData.address || '-' }}</div></div>
+          </div>
+          <div class="row q-col-gutter-md q-mt-md">
+            <div class="col-12 col-sm-6">
+              <div class="alert-box warning h-full">
+                <div class="head"><q-icon name="warning" class="q-mr-sm"/>แพ้ยา</div>
+                <div class="body">{{ patientData.allergies || 'ไม่มี' }}</div>
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <div class="alert-box info h-full">
+                <div class="head"><q-icon name="restaurant" class="q-mr-sm"/>แพ้อาหาร</div>
+                <div class="body">{{ patientData.foodAllergies || 'ไม่มี' }}</div>
+              </div>
+            </div>
+             <div class="col-12">
+              <div class="alert-box disease h-full">
+                <div class="head"><q-icon name="monitor_heart" class="q-mr-sm"/>โรคประจำตัว</div>
+                <div class="body">{{ patientData.underlyingDisease || 'ไม่มี' }}</div>
+              </div>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="isCropperVisible" persistent backdrop-filter="blur(4px)">
+       <q-card style="width: 500px; max-width: 90vw; background: #1e293b; color: white;">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6 header-title">ประวัติข้อมูล: {{ selectedVitalSign }}</div>
+          <div class="text-h6">ปรับแต่งรูปโปรไฟล์</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup @click="playClickSound"/>
+          <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
         <q-card-section>
-          <apexchart :type="chartType" height="350" :options="chartOptions" :series="chartSeries"></apexchart>
+          <cropper ref="cropperRef" class="cropper-container" :src="tempImage" :stencil-component="CircleStencil" :stencil-props="{ aspectRatio: 1/1 }" background-class="cropper-background" />
+          <div class="text-caption text-grey-5 q-mt-sm text-center">ลากและย่อขยายเพื่อจัดตำแหน่งรูปภาพ</div>
         </q-card-section>
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat label="ยกเลิก" color="grey-5" v-close-popup />
+          <q-btn unelevated rounded color="cyan-3" text-color="dark" label="บันทึกรูปภาพ" icon="save" @click="cropAndUpload" :loading="uploading"/>
+        </q-card-actions>
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="isDetailDialogVisible">
-      <q-card style="width: 600px; max-width: 80vw;" class="main-card">
-        <q-toolbar :class="['main-card-header', { 'bg-positive-tint': selectedDetail.isHighlight }]">
-          <q-icon :name="selectedDetail.icon" size="24px" class="q-mr-md" />
-          <q-toolbar-title class="text-h6 text-weight-bold header-title">{{ selectedDetail.title }}</q-toolbar-title>
-          <q-btn flat round dense icon="close" v-close-popup @click="playClickSound"/>
-        </q-toolbar>
-        <q-card-section class="q-pa-lg">
-          <div v-if="!selectedDetail.type" :class="['text-body1', { 'text-h5 text-positive text-weight-bold': selectedDetail.isHighlight }]">
-            {{ selectedDetail.content || 'ไม่ระบุ' }}
-          </div>
-          <q-list v-if="selectedDetail.type === 'procedures'" dense separator class="elegant-info-list">
-            <q-item v-for="(proc, index) in selectedDetail.content" :key="index" class="q-py-sm">
-              <q-item-section>
-                <q-item-label class="text-body1">{{ proc.service }}</q-item-label>
-                <q-item-label caption v-if="proc.diagnosis && proc.diagnosis !== '-'">วินิจฉัย: {{ proc.diagnosis }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-          <q-list v-if="selectedDetail.type === 'medications'" dense separator class="elegant-info-list">
-            <q-item v-for="(med, index) in selectedDetail.content" :key="index" class="q-py-sm">
-              <q-item-section>
-                <q-item-label class="text-body1">{{ med.name }}</q-item-label>
-                <q-item-label caption>{{ med.dosage }} | จำนวน: {{ med.quantity }}</q-item-label>
-                <q-item-label caption>วิธีใช้: {{ med.instruction }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card-section>
-      </q-card>
+    <q-dialog v-model="isAvatarViewerVisible" backdrop-filter="blur(10px)">
+      <div class="row items-center justify-center relative-position" style="width: 100vw; height: 100vh; pointer-events: none;" @click.self="isAvatarViewerVisible = false">
+        <q-img v-if="patientData.avatarUrl" :src="patientData.avatarUrl" class="rounded-borders shadow-24" style="pointer-events: auto; max-width: 90vw; max-height: 90vh; min-width: 300px; width: auto; border: 4px solid rgba(255,255,255,0.1);" fit="contain" spinner-color="cyan-3" />
+        <q-avatar v-else size="300px" color="primary" text-color="white" icon="person" style="pointer-events: auto;" />
+        <q-btn round color="white" text-color="black" icon="close" size="lg" class="absolute-bottom q-mb-xl shadow-10" style="pointer-events: auto; bottom: 30px; left: 50%; transform: translateX(-50%);" v-close-popup />
+      </div>
     </q-dialog>
 
-  </div>
+  </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { date } from 'quasar';
-import * as Tone from 'tone';
-import VueApexCharts from 'vue3-apexcharts';
+import { useRoute, useRouter } from 'vue-router';
+import { useQuasar } from 'quasar';
+import axios from 'axios';
+import { Cropper, CircleStencil } from 'vue-advanced-cropper';
+import 'vue-advanced-cropper/dist/style.css';
 
-// --- SOUND SYSTEM ---
-const clickSynth = new Tone.FMSynth({ harmonicity: 8, modulationIndex: 2, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 }, modulation: { type: "square" }, modulationEnvelope: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.2 } }).toDestination();
-clickSynth.volume.value = -10;
-const playClickSound = () => {
-  if (Tone.context.state !== 'running') Tone.context.resume();
-  clickSynth.triggerAttackRelease("C5", "32n");
-};
+const route = useRoute();
+const router = useRouter();
+const $q = useQuasar();
 
-// Define 'apexchart' component for use in the template
-const apexchart = VueApexCharts;
-
+// State
+const loading = ref(true);
 const patientData = ref({});
-const currentVisit = ref({
-    symptoms: { reviewOfSystems: {} }, vitalSigns: [], procedures: [], medications: [], referral: {}
-});
 const treatmentHistory = ref([]);
-const isChartDialogVisible = ref(false);
-const selectedVitalSign = ref(null);
+const currentVisit = ref(null);
+const currentMainTab = ref('summary'); // 🔥 Default to Summary Tab
+const sortOrder = ref('desc');
+const isProfileDialogVisible = ref(false);
+const isAvatarViewerVisible = ref(false);
+const fileInput = ref(null);
 
-// --- NEW DIALOG LOGIC ---
-const isDetailDialogVisible = ref(false);
-const selectedDetail = ref({});
-const showDetailDialog = (detail) => {
-  selectedDetail.value = detail;
-  isDetailDialogVisible.value = true;
-  playClickSound();
+// Cropper State
+const isCropperVisible = ref(false);
+const tempImage = ref(null);
+const cropperRef = ref(null);
+const uploading = ref(false);
+
+const playClickSound = () => {};
+const openProfileDialog = () => { isProfileDialogVisible.value = true; };
+const triggerFileSelect = () => { fileInput.value.click(); };
+
+const onFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    tempImage.value = e.target.result;
+    isCropperVisible.value = true;
+    event.target.value = '';
+  };
+  reader.readAsDataURL(file);
 };
 
-onMounted(() => {
-  const demoData = createDemoPatientData();
-  patientData.value = demoData.patient;
+const cropAndUpload = () => {
+  const { canvas } = cropperRef.value.getResult();
+  if (!canvas) return;
+  uploading.value = true;
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    const formData = new FormData();
+    formData.append('avatar', blob, 'avatar.jpg');
+    try {
+      const res = await axios.post(`http://localhost:3000/api/patients/${route.params.id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data && res.data.avatarUrl) {
+         patientData.value.avatarUrl = `http://localhost:3000${res.data.avatarUrl}?t=${Date.now()}`;
+      }
+      $q.notify({ type: 'positive', message: 'อัปเดตรูปโปรไฟล์สำเร็จ' });
+      isCropperVisible.value = false;
+    } catch (e) {
+      console.error(e);
+      $q.notify({ type: 'negative', message: 'อัปโหลดไม่สำเร็จ' });
+    } finally {
+      uploading.value = false;
+    }
+  }, 'image/jpeg');
+};
 
-  const demoVisits = createDemoVisitsForPatient();
-  treatmentHistory.value = demoVisits.map(visit => transformApiDataToVisit(visit));
+const sortedTreatmentHistory = computed(() => {
+  const sorted = [...treatmentHistory.value];
+  sorted.sort((a, b) => sortOrder.value === 'asc' ? new Date(a.visitDate) - new Date(b.visitDate) : new Date(b.visitDate) - new Date(a.visitDate));
+  return sorted;
+});
 
-  if (treatmentHistory.value.length > 0) {
-    currentVisit.value = treatmentHistory.value[0];
+const getTabLabel = (tab) => {
+    switch(tab) {
+        case 'summary': return 'สรุป';
+        case 'vitals': return 'สัญญาณชีพ';
+        case 'symptoms': return 'อาการ';
+        case 'treatment': return 'การวินิจฉัย';
+        case 'medication': return 'ยา';
+        default: return tab;
+    }
+}
+
+const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const getColorRGB = (c) => ({ red: '239, 68, 68', orange: '249, 115, 22', blue: '59, 130, 246', pink: '236, 72, 153', green: '34, 197, 94', grey: '156, 163, 175', teal: '20, 184, 166', purple: '168, 85, 247', indigo: '99, 102, 241', 'lime-9': '130, 193, 22' }[c] || '34, 211, 238');
+
+const parseRosItems = (value) => {
+  if (!value || value === '-') return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [value];
+  } catch (e) {
+    return value.replace(/[\[\]"]/g, '').split(',').map(s => s.trim()).filter(Boolean);
   }
-});
-
-
-// --- CHART LOGIC ---
-const showHistoryChart = (vitalLabel) => {
-    if (['ส่วนสูง', 'น้ำหนัก', 'BMI', 'รอบเอว'].includes(vitalLabel)) return;
-    selectedVitalSign.value = vitalLabel;
-    isChartDialogVisible.value = true;
 };
-const validChartData = computed(() => {
-    if (!selectedVitalSign.value) return [];
-    return treatmentHistory.value.map(visit => {
-        const vital = visit.vitalSigns.find(v => v.label === selectedVitalSign.value);
-        if (!vital || vital.value === 'N/A') return null;
-        if (selectedVitalSign.value === 'ความดัน') {
-            const [sys, dia] = vital.value.split('/').map(parseFloat);
-            if (isNaN(sys) || isNaN(dia)) return null;
-            return { date: visit.visitDate, systolic: sys, diastolic: dia };
-        } else {
-            const value = parseFloat(vital.value);
-            if (isNaN(value)) return null;
-            return { date: visit.visitDate, value: value };
-        }
-    }).filter(v => v !== null).reverse();
-});
-const chartType = computed(() => validChartData.value.length > 1 ? 'line' : 'scatter');
-const chartSeries = computed(() => {
-    if (validChartData.value.length === 0) return [];
-    if (selectedVitalSign.value === 'ความดัน') {
-        return [
-            { name: 'Systolic (ตัวบน)', data: validChartData.value.map(v => v.systolic) },
-            { name: 'Diastolic (ตัวล่าง)', data: validChartData.value.map(v => v.diastolic) }
-        ];
-    } else {
-        return [{ name: selectedVitalSign.value, data: validChartData.value.map(v => v.value) }];
-    }
-});
-const chartOptions = computed(() => {
-    if (validChartData.value.length === 0) return {};
-    const options = {
-        chart: { id: 'vital-signs-history', toolbar: { show: false }, background: 'transparent' },
-        theme: { mode: 'dark' },
-        stroke: { curve: 'smooth', width: 3 },
-        xaxis: {
-            categories: validChartData.value.map(v => date.formatDate(v.date, 'DD/MM/YY')),
-            labels: { style: { colors: '#e0e0e0' } },
-        },
-        yaxis: { labels: { style: { colors: '#e0e0e0' } } },
-        grid: { borderColor: 'rgba(0, 184, 255, 0.1)' },
-        markers: { size: 5 },
-        dataLabels: { enabled: true, background: { enabled: true, borderRadius: 2, opacity: 0.7, foreColor: '#000' } },
-        tooltip: { theme: 'dark', x: { format: 'dd/MM/yy' } },
-        legend: { labels: { colors: '#e0e0e0' } }
-    };
-    if (selectedVitalSign.value === 'ความดัน') {
-        options.colors = ['#C10015', '#1976D2'];
-        options.yaxis.title = { text: 'mmHg', style: { color: '#90a4ae' } };
-    } else {
-        options.colors = ['#00b8ff'];
-    }
-    return options;
-});
 
-// --- HELPER FUNCTIONS ---
-const printVisit = () => window.print();
-const getVitalSignColorClass = (label, value, gender) => {
-    if (value === 'N/A' || !value) return ''; const numValue = parseFloat(value); if (isNaN(numValue)) return '';
-    switch (label) {
-        case 'อุณหภูมิ': if (numValue >= 38.5) return 'text-negative'; if (numValue > 37.5) return 'text-warning'; if (numValue < 36.5) return 'text-warning'; return 'text-positive';
-        case 'ชีพจร': if (numValue > 120 || numValue < 50) return 'text-negative'; if (numValue > 100 || numValue < 60) return 'text-warning'; return 'text-positive';
-        case 'การหายใจ': if (numValue > 24 || numValue < 10) return 'text-negative'; if (numValue > 20 || numValue < 12) return 'text-warning'; return 'text-positive';
-        case 'O2 Sat': if (numValue < 92) return 'text-negative'; if (numValue <= 95) return 'text-warning'; return 'text-positive';
-        case 'ความดัน': const [systolic, diastolic] = value.split('/').map(v => parseInt(v, 10)); if (isNaN(systolic) || isNaN(diastolic)) return ''; if (systolic >= 140 || diastolic >= 90) return 'text-negative'; if (systolic >= 130 || diastolic >= 80) return 'text-warning'; if (systolic < 90 || diastolic < 60) return 'text-warning'; return 'text-positive';
-        case 'BMI': if (numValue >= 30) return 'text-negative'; if (numValue >= 25 || numValue < 18.5) return 'text-warning'; return 'text-positive';
-        case 'รอบเอว': if (gender === 'male' && numValue >= 90) return 'text-negative'; if (gender === 'female' && numValue >= 80) return 'text-negative'; return 'text-positive';
-        default: return '';
-    }
+const processPatientData = (raw) => {
+  const getAge = (b) => { if(!b) return 0; const diff = Date.now() - new Date(b).getTime(); return Math.floor(diff / 31557600000); };
+  return {
+    ...raw,
+    patientId: raw.patient_id,
+    firstName: raw.first_name,
+    lastName: raw.last_name,
+    title: raw.prefix,
+    nationalId: raw.national_id,
+    age: getAge(raw.birth_date),
+    sex: ['นาง','นางสาว','เด็กหญิง'].includes(raw.prefix) ? 'หญิง' : 'ชาย',
+    bloodGroup: raw.blood_group,
+    allergies: raw.drug_allergies,
+    foodAllergies: raw.food_allergies,
+    underlyingDisease: raw.underlying_disease,
+    address: raw.address,
+    avatarUrl: raw.avatar_url ? `http://localhost:3000${raw.avatar_url}` : null
+  };
 };
-const transformApiDataToVisit = (visitData) => {
-    const vitalSigns = visitData.vitalSigns || {};
-    let calculatedBmi = 'N/A';
-    if (vitalSigns.height > 0 && vitalSigns.weight > 0) { calculatedBmi = (vitalSigns.weight / ((vitalSigns.height / 100) ** 2)).toFixed(1); }
-    const bloodPressureValue = (vitalSigns.bloodPressureSystolic && vitalSigns.bloodPressureDiastolic) ? `${vitalSigns.bloodPressureSystolic}/${vitalSigns.bloodPressureDiastolic}` : 'N/A';
-    const mainDiagnosis = visitData.doctorNotes?.diagnosis?.filter(d => d !== 'Other').join(', ') || visitData.procedures?.[0]?.diagnosis || 'ไม่ระบุ';
-    return {
-        id: visitData.visitId ?? Date.now(), visitDate: visitData.recordDateTime ?? new Date().toISOString(), mainDiagnosis: mainDiagnosis,
-        symptoms: { chiefComplaint: visitData.symptoms?.chiefComplaint ?? 'ไม่ระบุ', presentIllness: visitData.symptoms?.presentIllness ?? 'ไม่ระบุ' },
-        vitalSigns: [
-            { label: 'อุณหภูมิ', value: vitalSigns.temperature ?? 'N/A', unit: '°C', icon: 'o_thermostat', color: 'red', ref: '36.5-37.5' },
-            { label: 'ชีพจร', value: vitalSigns.pulse ?? 'N/A', unit: 'bpm', icon: 'o_monitor_heart', color: 'green', ref: '60-100' },
-            { label: 'การหายใจ', value: vitalSigns.breathing ?? 'N/A', unit: '/min', icon: 'o_air', color: 'purple', ref: '12-20' },
-            { label: 'O2 Sat', value: vitalSigns.oxygenSaturation ?? 'N/A', unit: '%', icon: 'o_bloodtype', color: 'light-blue', ref: '>95' },
-            { label: 'ความดัน', value: bloodPressureValue, unit: 'mmHg', icon: 'o_favorite', color: 'orange', ref: '<120/80' },
-            { label: 'BMI', value: calculatedBmi, unit: 'kg/m²', icon: 'o_calculate', color: 'teal', ref: '18.5-22.9' },
-            { label: 'ส่วนสูง', value: vitalSigns.height ?? 'N/A', unit: 'ซม.', icon: 'o_straighten', color: 'brown', ref: '-' },
-            { label: 'น้ำหนัก', value: vitalSigns.weight ?? 'N/A', unit: 'กก.', icon: 'o_scale', color: 'deep-purple', ref: '-' },
-            { label: 'รอบเอว', value: vitalSigns.waist ?? 'N/A', unit: 'ซม.', icon: 'o_social_distance', color: 'pink', ref: 'ช<90,ญ<80' },
-        ],
-        procedures: visitData.procedures ?? [], medications: visitData.medications ?? []
-    };
+
+const processVisitData = (raw) => {
+  const vs = raw.vitalSign || raw.vitalSigns || raw.vital_signs || {};
+  const pi = raw.present_illness || raw.PresentIllness || raw.pi || raw.notes || '-';
+
+  let cc = '-';
+  if (raw.symptoms?.chiefComplaints && Array.isArray(raw.symptoms.chiefComplaints)) {
+      cc = raw.symptoms.chiefComplaints.map(c => c.name).join(', ');
+  } else if (Array.isArray(raw.symptoms) && raw.symptoms.length > 0) {
+    cc = raw.symptoms.map(s => s.symptom?.symptom_name || s.symptom_name).filter(Boolean).join(', ');
+  } else if (raw.notes) {
+    cc = raw.notes;
+  }
+
+  const proceduresSource = raw.visitProcedures || raw.procedures || [];
+  const mainDiag = proceduresSource.find(p => p.diagnosis)?.diagnosis?.diagnosis_name || raw.diagnosis_note || 'ไม่ระบุ';
+
+  const rosData = [
+    { label: 'อาการทั่วไป', value: raw.ros_general },
+    { label: 'ศีรษะและลำคอ', value: raw.ros_head_and_neck },
+    { label: 'ระบบทางเดินหายใจ', value: raw.ros_respiratory },
+    { label: 'ระบบหัวใจ/หลอดเลือด', value: raw.ros_cardiovascular },
+    { label: 'ระบบทางเดินอาหาร', value: raw.ros_gastrointestinal },
+    { label: 'ระบบผิวหนัง', value: raw.ros_skin }
+  ].filter(item => item.value && item.value !== '-' && parseRosItems(item.value).length > 0);
+
+  // 🔥 Process Prescriptions (รายการยา)
+  const prescriptionsData = (raw.prescriptions || []).map(p => ({
+      // p.product มาจาก relation, ถ้าไม่มีให้ดู p.drug_name (เผื่อ field legacy)
+      name: p.product?.product_name || p.drug_name || 'ยาไม่ระบุชื่อ',
+      qty: p.quantity || '-',
+      usage: p.instruction || '-' // Database field ชื่อ instruction
+  }));
+
+  return {
+    id: raw.visit_id,
+    visitDate: raw.visit_datetime,
+    mainDiagnosis: mainDiag,
+
+    vitalSigns: [
+      { label: 'ความดัน', value: (vs.blood_pressure_systolic && vs.blood_pressure_diastolic) ? `${vs.blood_pressure_systolic}/${vs.blood_pressure_diastolic}` : '-', unit: 'mmHg', icon: 'bloodtype', color: 'pink', ref: '< 120/80' },
+      { label: 'ชีพจร', value: vs.pulse || '-', unit: 'bpm', icon: 'favorite', color: 'red', ref: '60-100' },
+      { label: 'อุณหภูมิ', value: vs.temperature || '-', unit: '°C', icon: 'thermostat', color: 'orange', ref: '36.5-37.5' },
+      { label: 'การหายใจ', value: vs.respiration || '-', unit: '/min', icon: 'air', color: 'blue', ref: '12-20' },
+      { label: 'ออกซิเจน', value: vs.oxygen_saturation || '-', unit: '%', icon: 'water_drop', color: 'cyan', ref: '95-100' },
+      { label: 'น้ำหนัก', value: vs.weight || '-', unit: 'kg', icon: 'monitor_weight', color: 'indigo', ref: '-' },
+      { label: 'ส่วนสูง', value: vs.height || '-', unit: 'cm', icon: 'height', color: 'purple', ref: '-' },
+      { label: 'BMI', value: vs.bmi || '-', unit: '', icon: 'calculate', color: 'teal', ref: '18.5-22.9' },
+      { label: 'รอบเอว', value: vs.waist_circumference || '-', unit: 'cm', icon: 'straighten', color: 'lime-9', ref: '< 90(ช)/80(ญ)' }
+    ],
+
+    symptoms: {
+      chiefComplaint: cc || '-',
+      presentIllness: pi,
+      ros: rosData
+    },
+
+    // ส่งรายการยาไปให้ frontend ใช้
+    prescriptions: prescriptionsData,
+
+    procedures: proceduresSource.flatMap(p => [
+        p.service ? { service: p.service.service_name } : null,
+        p.procedure ? { service: p.procedure.procedure_name } : null
+      ]).filter(Boolean)
+  };
 };
-const createDemoPatientData = () => ({ patient: { id: 1, patientId: 'HN-DEMO', firstName: 'ข้อมูล', lastName: 'ตัวอย่าง', gender: 'male', age: 40, birthDate: '1985-01-01T00:00:00.000Z', bloodGroup: 'A+', allergies: 'Penicillin', address: '123/45 ถนนสุขุมวิท กรุงเทพมหานคร 10110' } });
-const createDemoVisitsForPatient = () => ([
-    { visitId: 1, recordDateTime: '2025-07-13T11:30:00.000Z', symptoms: { chiefComplaint: 'มีไข้สูง ไอ เจ็บคอ', presentIllness: 'มีอาการไข้เมื่อ 2 วันก่อน' }, vitalSigns: { temperature: '38.5', pulse: '95', breathing: '22', bloodPressureSystolic: '125', bloodPressureDiastolic: '85', oxygenSaturation: '97', height: '175', weight: '72', waist: '88' }, doctorNotes: { diagnosis: ['ไข้หวัดใหญ่'] }, procedures: [ { service: 'ตรวจรักษา', diagnosis: 'ไข้หวัดใหญ่' } ], medications: [ { name: 'Oseltamivir', dosage: '75mg', quantity: '10', instruction: 'วันละ 2 ครั้ง' } ] },
-    { visitId: 2, recordDateTime: '2025-06-20T14:00:00.000Z', symptoms: { chiefComplaint: 'เจ็บคอ', presentIllness: 'เจ็บคอเวลากลืน' }, vitalSigns: { temperature: '37.2', pulse: '88', breathing: '18', bloodPressureSystolic: '130', bloodPressureDiastolic: '88', oxygenSaturation: '99', height: '175', weight: '72', waist: '88' }, doctorNotes: { diagnosis: ['คออักเสบ'] }, medications: [ { name: 'Ibuprofen', dosage: '400mg', quantity: '10', instruction: 'เมื่อมีอาการปวด' } ] },
-]);
-const formatDate = (value) => { if (!value) return null; return date.formatDate(value, 'DD MMMM YYYY'); };
+
+const fetchData = async () => {
+  loading.value = true;
+  try {
+    const res = await axios.get(`http://localhost:3000/api/patients/${route.params.id}/record`);
+    patientData.value = processPatientData(res.data.patient);
+    treatmentHistory.value = res.data.visits.map(processVisitData);
+    if(treatmentHistory.value.length > 0) currentVisit.value = sortedTreatmentHistory.value[0];
+  } catch (e) { $q.notify({ type: 'negative', message: 'โหลดข้อมูลไม่สำเร็จ' }); }
+  finally { loading.value = false; }
+};
+
+onMounted(fetchData);
 </script>
 
 <style scoped lang="scss">
-.summary-grid {
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 24px;
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
 
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr;
-  }
+$dark-bg: #0f172a;
+$glass-bg: rgba(30, 41, 59, 0.6);
+$border: 1px solid rgba(255,255,255,0.08);
+$cyan: #22d3ee;
+
+/* Main Layout */
+.rounded-page-wrapper { background: #0f172a; font-family: 'Sarabun'; color: #e2e8f0; border-radius: 24px; margin: 16px; height: calc(100vh - 32px); overflow: hidden; box-shadow: 0 15px 50px rgba(0,0,0,0.5); border: $border; }
+.fixed-layout { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header & Nav */
+.external-header { height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.9); border-bottom: $border; }
+.back-button-glassy { background: rgba(255,255,255,0.05); color: #94a3b8; border: $border; &:hover { background: rgba(255,255,255,0.1); color: white; } }
+.glassy-tab-group { background: rgba(0,0,0,0.2); padding: 4px; border-radius: 50px; display: flex; gap: 8px; }
+.tab-button-glassy { color: #64748b;width: 130px; /* กำหนดความกว้างให้เท่ากันทุกปุ่ม (ปรับตัวเลขได้ตามชอบ) */
+  justify-content: center; font-weight: 600; &.is-active { background: $cyan; color: #0f172a; box-shadow: 0 0 15px rgba(34,211,238,0.3); } }
+
+/* Layout & Panels */
+.layout-container-wrapper { flex: 1; padding: 16px; overflow: hidden; display: flex; }
+.layout-container { flex: 1; display: flex; flex-direction: column; background: $glass-bg; backdrop-filter: blur(10px); border-radius: 16px; border: $border; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+.global-top-bar { height: 64px; border-bottom: $border; display: flex; align-items: center; padding: 0 24px; background: rgba(0,0,0,0.2); }
+.content-grid { flex: 1; display: grid; grid-template-columns: 320px 1fr; overflow: hidden; }
+.left-panel { border-right: $border; display: flex; flex-direction: column; background: rgba(0,0,0,0.1); }
+.panel-header { height: 50px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: $border; background: rgba(255,255,255,0.02); }
+.right-panel { padding: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.content-frame-wrapper { flex: 1; display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.2); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.05); padding: 16px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.3); }
+
+/* History List */
+.history-list { padding: 10px; }
+.history-item { border-radius: 8px; margin-bottom: 8px; transition: all 0.2s; position: relative; overflow: hidden; &:hover { background: rgba(255,255,255,0.05); } &.is-active { background: rgba(34,211,238,0.1); .indicator-bar { opacity: 1; } } }
+.indicator-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: $cyan; opacity: 0; transition: opacity 0.2s; }
+.detail-card { flex: 1; background: transparent; border-radius: 12px; overflow: hidden; }
+.empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0.5; }
+.empty-state-small { text-align: center; padding: 40px; opacity: 0.7; }
+.patient-info-wrapper { display: flex; align-items: center; cursor: pointer; width: 100%; &:hover { .text-h6 { color: $cyan; } } }
+.avatar-ring { padding: 2px; border: 2px solid $cyan; border-radius: 50%; display: flex; }
+/* แก้ไขตรงนี้ครับ */
+.alert-badge {
+  display: flex; align-items: center; justify-content: flex-start; padding: 0 12px;
+  width: 85px; height: 28px; border-radius: 14px;
+  font-size: 0.85rem; font-weight: 600; color: white; box-shadow: none;
+
+  &.drug { background: #ef4444; }      /* สีแดง (แพ้ยา) */
+  &.food { background: #f97316; }      /* 🔥 เพิ่มบรรทัดนี้: สีส้ม (แพ้อาหาร) */
+  &.disease { background: #9333ea; }   /* สีม่วง (โรคประจำตัว) */
+}.badge-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 6px; }
+.opacity-20 { opacity: 0.2; } .h-full { height: 100%; } .no-margin { margin: 0; }
+.profile-dialog { width: 650px; background: #1e293b; color: white; border-radius: 16px; border: $border; }
+.close-btn { position: absolute; top: 10px; right: 10px; color: #94a3b8; z-index: 10; }
+.profile-avatar { overflow: hidden; border: 4px solid #1e293b; box-shadow: 0 0 0 2px $cyan, 0 0 20px rgba(34, 211, 238, 0.4); background-color: #334155; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat-box { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: $border; }
+.stat-box .label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; }
+.stat-box .value { font-size: 1.2rem; font-weight: bold; color: white; }
+
+/* Vitals (Capsule) */
+.vitals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.vital-card { border-radius: 50px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px 20px; display: flex; align-items: center; gap: 16px; transition: all 0.2s ease; min-height: 84px; box-sizing: border-box; &:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.06); box-shadow: 0 4px 15px rgba(0,0,0,0.1); } }
+.vital-icon { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.vital-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.vital-label { font-size: 0.85rem; color: #94a3b8; margin-bottom: 2px; font-weight: 600; }
+.vital-value { font-size: 1.35rem; font-weight: bold; color: white; line-height: 1.2; }
+.unit { font-size: 0.9rem; font-weight: normal; color: #94a3b8; margin-left: 4px; }
+.vital-ref { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+/* 🔥 New: Medication Cards */
+.med-card {
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px;
+  padding: 16px; display: flex; align-items: center; gap: 16px; transition: all 0.2s;
+  &:hover { background: rgba(255, 255, 255, 0.06); transform: translateY(-2px); border-color: rgba(45, 212, 191, 0.3); }
 }
+.med-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(45, 212, 191, 0.15); color: #2dd4bf; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.med-info { flex: 1; }
+.med-name { font-size: 1.1rem; font-weight: bold; color: white; margin-bottom: 4px; }
+.med-usage { font-size: 0.9rem; color: #94a3b8; display: flex; align-items: center; }
+.med-qty { text-align: right; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 8px; }
+.qty-val { font-size: 1.2rem; font-weight: bold; color: #2dd4bf; }
+.qty-unit { font-size: 0.7rem; color: #64748b; }
 
-.left-column, .right-column {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
+/* 🔥 New: Summary Page Elements */
+.mini-vital-card { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; display: flex; align-items: center; gap: 10px; }
+.med-capsule { background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.2); padding: 8px 12px; border-radius: 30px; display: flex; align-items: center; color: white; font-size: 0.95rem; }
+.badge-qty { background: #2dd4bf; color: black; font-size: 0.75rem; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
 
-.header-title {
-  color: #ffffff;
-}
+/* ROS */
+.ros-box { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: all 0.3s ease; &:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(34, 211, 238, 0.3); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); } }
+.ros-header { padding: 12px 16px; background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.ros-content { padding: 12px 16px; flex: 1; }
+.capsule-wrapper { display: flex; flex-wrap: wrap; gap: 8px; }
+.ros-capsule { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; line-height: 1.4; background: rgba(34, 211, 238, 0.15); color: #a5f3fc; border: 1px solid rgba(34, 211, 238, 0.2); backdrop-filter: blur(4px); transition: background 0.2s; &:hover { background: rgba(34, 211, 238, 0.25); color: white; } &.more { background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px dashed rgba(255, 255, 255, 0.2); cursor: help; &:hover { background: rgba(255, 255, 255, 0.1); color: white; border-color: rgba(255, 255, 255, 0.4); } } }
 
-.welcome-text {
-  color: #90a4ae;
-}
-
-.main-card {
-  background: linear-gradient(135deg, rgba(38, 50, 56, 0.5), rgba(38, 50, 56, 0.3));
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 184, 255, 0.2);
-  color: #e0e0e0;
-  overflow: hidden;
-}
-
-.main-card-header {
-  background-color: rgba(0, 184, 255, 0.05);
-  border-bottom: 1px solid rgba(0, 184, 255, 0.15);
-}
-
-.profile-card-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px;
-}
-
-.profile-avatar {
-  border: 3px solid #00b8ff;
-  box-shadow: 0 0 10px rgba(0, 184, 255, 0.4);
-}
-
-.profile-details-list {
-  .q-item {
-    padding: 12px 24px;
-  }
-}
-
-.themed-list {
-  .q-item {
-    padding: 12px 16px;
-    transition: background-color 0.2s;
-    &:hover:not(.active-visit-item) {
-      background-color: rgba(255, 255, 255, 0.03);
-    }
-  }
-  .active-visit-item {
-    background-color: rgba(0, 184, 255, 0.2) !important;
-    color: white !important;
-    font-weight: bold;
-    border-left: 4px solid #00b8ff;
-    padding-left: 12px;
-  }
-}
-
-.stat-card {
-  cursor: pointer;
-  height: 100%;
-}
-
-.interactive-card {
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-  &:hover {
-    transform: translateY(-6px);
-    border-color: rgba(0, 184, 255, 0.4);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
-  }
-}
-
-.stat-card-section {
-  flex-grow: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.stat-icon {
-  opacity: 0.5;
-}
-
-.tooltip-glassy {
-  background: rgba(38, 50, 56, 0.8);
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(0, 184, 255, 0.2);
-  color: white;
-}
-
-.list-item-animation {
-  opacity: 0;
-  animation: floatUp 0.6s ease-out forwards;
-}
-
-@keyframes floatUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-
-/* ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ */
-/* --- START: POPUP DIALOG TIMELINE STYLES --- */
-/* ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ */
-
-.timeline-card {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.timeline-scroll-area {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
-
-.elegant-timeline-container {
-  display: flex;
-  flex-direction: column;
-  gap: 36px;
-}
-
-.elegant-timeline-section {
-  position: relative;
-  &:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    bottom: -18px;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(to right, transparent, rgba(0, 184, 255, 0.1), transparent);
-  }
-}
-
-.elegant-section-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #cce7ff;
-  margin-bottom: 24px;
-}
-
-.elegant-header-icon {
-  font-size: 28px;
-  color: #00b8ff;
-}
-
-.elegant-section-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.elegant-timeline-card {
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
-  border: 1px solid rgba(0, 184, 255, 0.15);
-  padding: 16px 20px;
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  transition: all 0.3s ease;
-  cursor: pointer; // ทำให้รู้ว่าคลิกได้
-
-  &:hover {
-    border-color: rgba(0, 184, 255, 0.4);
-    background: rgba(0, 184, 255, 0.05);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    transform: translateY(-2px);
-  }
-}
-
-.highlight-diagnosis {
-  border-color: #26A69A;
-  background: rgba(38, 166, 154, 0.1);
-
-  &:hover {
-    border-color: #26A69A;
-    background: rgba(38, 166, 154, 0.15);
-  }
-}
-
-.bg-positive-tint {
-  background-color: rgba(38, 166, 154, 0.15) !important;
-}
-
-.item-icon-wrapper {
-  flex-shrink: 0;
-  padding-top: 4px;
-}
-
-.item-icon {
-  font-size: 24px;
-  color: #00b8ff;
-  &.highlight { color: #26A69A; }
-}
-
-.item-content-wrapper {
-  flex-grow: 1;
-  overflow: hidden; /* ป้องกันข้อความยาวเกิน */
-}
-
-.item-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #e0e0e0;
-  margin-bottom: 4px;
-}
-
-.item-description {
-  font-size: 0.95rem;
-  color: #b0c2d2;
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.elegant-info-list {
-  background: transparent;
-  .q-item {
-    padding: 4px 0;
-    min-height: unset;
-  }
-  .q-item-label {
-    line-height: 1.4;
-  }
-  .q-item-label[caption] {
-    color: #90a4ae;
-    font-size: 0.85rem;
-  }
-}
-
-/* List ที่แสดงแค่ 1-2 รายการแรกเป็น Preview */
-.preview-list {
-  .q-item:nth-child(n+3) {
-    display: none;
-  }
-}
-
-/* ▲▲▲▲▲ END: POPUP DIALOG TIMELINE STYLES ▲▲▲▲▲ */
+/* Shared */
+.info-box, .diagnosis-box { background: rgba(255,255,255,0.03); border: $border; border-radius: 12px; padding: 20px; }
+.box-label { text-transform: uppercase; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px; }
+.box-content, .diagnosis-text { font-size: 1.1rem; color: white; line-height: 1.5; }
+.diagnosis-text { font-size: 1.5rem; font-weight: bold; color: $cyan; }
+.procedure-item { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 8px; color: #e2e8f0; display: flex; align-items: center; }
+.alert-box { padding: 12px; border-radius: 8px; height: 100%; display: flex; flex-direction: column; .head { font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; font-size: 1rem; } .body { font-size: 0.95rem; line-height: 1.4; flex: 1; } &.warning { background: rgba(239,68,68,0.1); color: #fca5a5; } &.info { background: rgba(249, 115, 22, 0.1); color: #fdba74; } &.disease { background: rgba(147, 51, 234, 0.1); color: #e9d5ff; } }
+.cropper-container { height: 400px; background: #0f172a; }
+.cropper-background { background: #0f172a; }
 </style>

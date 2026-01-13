@@ -4,20 +4,31 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('products', {
       id: {
-        type: Sequelize.INTEGER,
+        allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        allowNull: false
+        type: Sequelize.INTEGER
       },
-      name: {
-        type: Sequelize.STRING(255),
-        allowNull: false,
-        unique: true
+      // ใช้ชื่อคอลัมน์ที่ถูกต้อง
+      product_name: {
+        type: Sequelize.STRING,
+        allowNull: false
       },
       price: {
         type: Sequelize.DECIMAL(10, 2),
         allowNull: false
       },
+      // เพิ่มคอลัมน์ category_id และความสัมพันธ์
+      category_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'categories',
+          key: 'category_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE'
+      }
     });
   },
   async down(queryInterface, Sequelize) {

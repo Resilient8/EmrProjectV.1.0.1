@@ -1,35 +1,45 @@
-// ในไฟล์ src/routes/visits.route.ts
-
 import { Router } from "express";
-import visitsController from "../controller/visits.controller";
-// --- 1. Import Controller สำหรับ "บันทึก" symptoms ---
-import { addVisitSymptoms } from "../controller/visitSymptoms.controller";
-import { getVisitProcedures, addOrUpdateVisitProcedures } from "../controller/visitProcedures.controller";
-import { getAllServices, getAllProcedures, getAllDiagnosis } from "../controller/masterData.controller";
+import { 
+    getAllVisits, 
+    createVisit, 
+    getVisitsByPatientId,
+    getVisitById,
+    getVisitDetails,      
+    updateVisitById,      
+    deleteVisitById,
+    updateVisitSymptoms,
+    updateVisitProcedures // ✅ 1. Import ตัวนี้เพิ่มเข้ามาจาก visits.controller
+} from "../controller/visits.controller"; 
 
 const router = Router();
 
-// --- Routes สำหรับข้อมูล Visit หลัก ---
-router.get("/", visitsController.getAllVisits);
-router.post("/", visitsController.createVisit);
-router.get("/patient/:patientId", visitsController.getVisitsByPatientId);
+// --- Routes หลัก ---
+router.get("/", getAllVisits);
+router.post("/", createVisit);
+router.get("/patient/:patientId", getVisitsByPatientId);
 
-// --- Routes สำหรับข้อมูล Master ---
-router.get("/master/services", getAllServices);
-router.get("/master/procedures", getAllProcedures);
-router.get("/master/diagnosis", getAllDiagnosis);
+// --- Route ดึงข้อมูล (หน้าห้องตรวจแพทย์) ---
+router.get("/details/:visit_id", getVisitDetails); 
 
-// --- Routes สำหรับข้อมูลย่อยของ Visit (ตาม ID) ---
-router.get("/:visit_id", visitsController.getVisitById);
-router.put("/:visit_id", visitsController.updateVisit);
+// -----------------------------------------------------------
+// 💥 ส่วนจัดการ Procedures (Diagnosis + Services + Procedures)
+// ✅ 2. แก้ไข: ใช้ updateVisitProcedures ที่เราเพิ่งสร้าง
+// -----------------------------------------------------------
+router.put("/:visit_id/procedures", updateVisitProcedures);
 
-// GET สำหรับ "ดึง" symptoms
-router.get("/:visit_id/symptoms", visitsController.getVisitSymptoms);
-// --- 2. เพิ่ม POST สำหรับ "บันทึก" symptoms ---
-router.post("/:visit_id/symptoms", addVisitSymptoms);
+// (ถ้า Frontend เก่ามีการเรียก POST ก็เปิดบรรทัดนี้ไว้ได้ครับ แต่ปกติใช้ PUT สำหรับ update)
+router.post("/:visit_id/procedures", updateVisitProcedures);
 
-// GET และ POST สำหรับ procedures
-router.get("/:visit_id/procedures", getVisitProcedures);
-router.post("/:visit_id/procedures", addOrUpdateVisitProcedures);
+
+// -----------------------------------------------------------
+// 💥 ส่วนจัดการ Symptoms (อาการ CC, PI, ROS)
+// -----------------------------------------------------------
+router.post("/:visit_id/symptoms", updateVisitSymptoms);
+router.put("/:visit_id/symptoms", updateVisitSymptoms);
+
+// --- Routes จัดการ Visit รายตัว (วางไว้ท้ายสุด เพื่อป้องกัน Route ชนกัน) ---
+router.get("/:visit_id", getVisitById);
+router.put("/:visit_id", updateVisitById);
+router.delete("/:visit_id", deleteVisitById);
 
 export default router;

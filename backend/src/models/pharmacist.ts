@@ -1,26 +1,32 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../db/sequelize';
 
-// Interface สำหรับนิยาม attributes ของ Pharmacist
+// Interface ต้องมี id และ user_id
 interface PharmacistAttributes {
-  user_id: number;
+  id: number;       // ✅ เพิ่ม id (Primary Key จริง)
+  user_id: number;  // ✅ เป็นแค่ Foreign Key (ไม่ใช่ PK)
   license_number: string | null;
 }
 
 class Pharmacist extends Model<PharmacistAttributes> implements PharmacistAttributes {
+  public id!: number;
   public user_id!: number;
   public license_number!: string | null;
 
-  // ฟังก์ชันสำหรับสร้างความสัมพันธ์
   static associate(models: any) {
     this.belongsTo(models.User, { foreignKey: 'user_id' });
   }
 }
 
 Pharmacist.init({
+  id: { // ✅ ใช้ id เป็น Primary Key
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
   user_id: {
     type: DataTypes.INTEGER,
-    primaryKey: true,
+    allowNull: false, // เภสัชกรต้องผูกกับ User เสมอ
   },
   license_number: {
     type: DataTypes.STRING(100),
@@ -29,7 +35,8 @@ Pharmacist.init({
 }, {
   sequelize,
   tableName: 'pharmacists',
-  timestamps: false
+  timestamps: true,   // ✅ ปกติ Migration จะมี created_at/updated_at
+  underscored: true   // ✅ เพื่อให้ mapping ชื่อคอลัมน์ถูกต้อง
 });
 
 export default Pharmacist;

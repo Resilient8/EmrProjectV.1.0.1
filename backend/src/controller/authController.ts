@@ -1,134 +1,110 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import User from '../models/user'; // ตรวจสอบว่า path นี้ตรงกับไฟล์ User Model ของคุณ
+import { Op } from 'sequelize';
 
-// --- 1. แก้ไขการ Import ---
-// Import db object ที่มีทุกอย่างเข้ามา
-import db from '../db'; 
-// ดึง Model และ sequelize ที่ต้องใช้ออกมา
-const { User, Doctor, Pharmacist, Department, sequelize } = db; 
-
-// --- 2. ฟังก์ชัน Register (แก้ไขใหม่ทั้งหมด) ---
-export const registerUser = async (req: Request, res: Response) => {
-  // รับข้อมูลจาก frontend
-  const {
-    prefix,
-    firstName,
-    lastName,
-    email,
-    password,
-    role, // 'Doctor', 'Nurse', 'Admin', 'Pharmacist'
-    licenseNumber,
-    specialization, // เฉพาะ Doctor
-    department // ชื่อแผนกของ Doctor
-  } = req.body;
-
-  // เริ่ม Transaction เพื่อให้แน่ใจว่าทุกอย่างสำเร็จหรือล้มเหลวไปพร้อมกัน
-  const t = await sequelize.transaction();
-
+// =========================================================
+// ✅ ฟังก์ชัน Register (ลงทะเบียน)
+// =========================================================
+export const register = async (req: Request, res: Response) => {
   try {
-    // ตรวจสอบอีเมลซ้ำ
-    const existingUser = await User.findOne({ where: { email: email } });
+    console.log("📥 Register Request:", req.body);
+    const { prefix, first_name, last_name, email, phone, password, role } = req.body;
+
+    // เช็คว่ามี User นี้อยู่แล้วหรือไม่
+    const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      await t.rollback(); // ยกเลิก transaction
-      return res.status(409).json({ message: "มีอีเมลนี้อยู่ในระบบแล้ว" });
+      return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
     }
 
-    // Hash รหัสผ่าน
-    const password_hash = await bcrypt.hash(password, 10);
-
-    // สร้างข้อมูลในตาราง users หลัก
+    // สร้าง User ใหม่
+    // ⚠️ หมายเหตุ: ใน Production ควรใช้ bcrypt hash password ก่อนบันทึก
     const newUser = await User.create({
-      prefix: prefix,
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-      password_hash: password_hash,
-      role: role
-    }, { transaction: t });
+      prefix,
+      first_name,
+      last_name,
+      email,
+      phone,
+      password_hash: password, 
+      role
+    });
 
-    // ถ้า Role เป็น Doctor ให้สร้างข้อมูลในตาราง doctors ด้วย
-    if (role === 'Doctor') {
-      // ค้นหา department_id จากชื่อ department ที่ส่งมา
-      const departmentRecord = await Department.findOne({ where: { name: department } });
-      if (!departmentRecord) {
-        await t.rollback();
-        return res.status(400).json({ message: `ไม่พบแผนกที่ชื่อว่า '${department}'` });
-      }
+    console.log("✅ Register Success:", newUser.email);
+    res.status(201).json({ message: 'ลงทะเบียนสำเร็จ', user: newUser });
 
-      await Doctor.create({
-        user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
-        license_number: licenseNumber,
-        specialization: specialization,
-        department_id: departmentRecord.id
-      }, { transaction: t });
-    }
-
-    // ถ้า Role เป็น Pharmacist ให้สร้างข้อมูลในตาราง pharmacists ด้วย
-    if (role === 'Pharmacist') {
-      await Pharmacist.create({
-        user_id: newUser.user_id, // ใช้ ID จาก user ที่เพิ่งสร้าง
-        license_number: licenseNumber
-      }, { transaction: t });
-    }
-
-    // ถ้าทุกอย่างสำเร็จ บันทึก Transaction
-    await t.commit();
-
-    res.status(201).json({ message: 'ลงทะเบียนสำเร็จ!', userId: newUser.user_id });
-
-  } catch (error) {
-    // ถ้ามีขั้นตอนไหนพลาด ให้ยกเลิกทั้งหมด
-    await t.rollback();
-    console.error("Register Error:", error);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดฝั่งเซิร์ฟเวอร์ระหว่างการลงทะเบียน" });
+  } catch (error: any) {
+    console.error('🔥 Register Error:', error);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลงทะเบียน', error: error.message });
   }
 };
 
-// --- 3. ฟังก์ชัน Login (ปรับปรุง) ---
-export const loginUser = async (req: Request, res: Response) => {
+// =========================================================
+// ✅ ฟังก์ชัน Login (แบบ Super Debug 🛠️)
+// =========================================================
+export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    console.log("------------------------------------------------");
+    console.log("📥 1. Login Process Started");
+    console.log("📥 Payload received:", req.body);
 
-    // ค้นหาผู้ใช้ พร้อมดึงข้อมูลเฉพาะทางมาด้วยถ้ามี
-    const user = await User.findOne({
-      where: { email: email },
-      include: [
-        { model: Doctor, as: 'doctorInfo', include: [Department] }, // ดึงข้อมูล Doctor และ Department
-        { model: Pharmacist, as: 'pharmacistInfo' } // ดึงข้อมูล Pharmacist
-      ]
+    const { email, username, password } = req.body;
+    
+    // 1. แปลงให้เป็นตัวพิมพ์เล็ก และตัดช่องว่างหน้าหลัง (Trim)
+    // เพื่อให้ avatar01@... กับ Avatar01@... ถือเป็นอันเดียวกัน
+    const loginIdentifier = (email || username || '').trim(); // เอา .toLowerCase() ออกก่อนเผื่อใน DB คุณเก็บตัวใหญ่
+
+    console.log(`🔎 2. Searching User by Identifier: "${loginIdentifier}"`);
+
+    if (!loginIdentifier) {
+        console.log("❌ Missing identifier (No email/username provided)");
+        return res.status(400).json({ message: 'กรุณาระบุ Email หรือ Username' });
+    }
+
+    // 2. ค้นหา User (ใช้ loginIdentifier หาในช่อง email)
+    const user = await User.findOne({ 
+        where: { email: loginIdentifier } 
     });
 
+    // 🛑 เช็คจุดที่ 1: เจอ User ในฐานข้อมูลไหม?
     if (!user) {
-      return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+        console.log("❌ User Not Found in Database!");
+        
+        // แอบดูข้อมูลใน DB หน่อยว่ามีใครบ้าง (เอามา 5 คนแรก)
+        const allUsers = await User.findAll({ limit: 5, attributes: ['email', 'role'] });
+        console.log("💡 Tips: รายชื่อที่มีอยู่ใน DB ตอนนี้:", allUsers.map(u => `${u.email} (${u.role})`));
+        
+        return res.status(401).json({ message: 'ไม่พบผู้ใช้งานนี้ในระบบ' });
     }
 
-    // เปรียบเทียบรหัสผ่าน
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    console.log("✅ User Found:", user.email);
+    console.log("🔑 Password stored in DB:", user.password_hash);
+    console.log("🔑 Password sent from Client:", password);
 
-    if (!isMatch) {
-      return res.status(401).json({ message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+    // 🛑 เช็คจุดที่ 2: รหัสผ่านตรงไหม?
+    // (หมายเหตุ: ถ้าคุณเข้ารหัสด้วย bcrypt ต้องเปลี่ยนบรรทัดนี้เป็น bcrypt.compare)
+    if (user.password_hash !== password) {
+        console.log("❌ Password Mismatch! (รหัสผ่านไม่ตรง)");
+        return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
     }
-    
-    // สร้าง JSON Web Token (JWT)
-    const token = jwt.sign(
-      { userId: user.user_id, role: user.role },
-      process.env.JWT_SECRET || 'your_default_secret_key',
-      { expiresIn: '1h' }
-    );
 
-    // แปลงข้อมูล user และลบรหัสผ่านก่อนส่งกลับ
-    const userResponse = user.toJSON();
-    delete userResponse.password_hash;
-    
-    res.status(200).json({ 
-      message: 'เข้าสู่ระบบสำเร็จ', 
-      user: userResponse,
-      token: token
+    console.log("✅ Login Success! Generating Response...");
+
+    // 3. Login สำเร็จ -> ส่งข้อมูลกลับ
+    res.status(200).json({
+      message: 'เข้าสู่ระบบสำเร็จ',
+      user: {
+        id: user.user_id,
+        email: user.email,
+        prefix: user.prefix,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
+        department: user.department,
+        avatar_url: user.avatar_url
+      }
     });
 
-  } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดฝั่งเซิร์ฟเวอร์ระหว่างการเข้าสู่ระบบ" });
+  } catch (error: any) {
+    console.error('🔥 Login Exception (Code 500):', error);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ', error: error.message });
   }
 };

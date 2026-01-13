@@ -12,7 +12,13 @@ import "@fortawesome/fontawesome-free/css/all.css";
 import "@fortawesome/fontawesome-free/js/all.js";
 import Chart from "react-apexcharts";
 
+// --- ADDED: Vue Tour ---
+import VueTour from 'vue-tour'
+import 'vue-tour/dist/vue-tour.css'
+// --- END ---
+
 const app = createApp(App);
+
 app.use(VueApexCharts);
 app.use(VueChartkick);
 app.use(Chart);
@@ -23,6 +29,10 @@ app.use(Quasar, {
     Dialog,
   },
 });
+
+// --- ADDED: Vue Tour ---
+app.use(VueTour);
+// --- END ---
 
 // เพิ่ม date filter ตรงนี้
 app.config.globalProperties.$filters = {

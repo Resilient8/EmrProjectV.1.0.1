@@ -1,50 +1,51 @@
 import axios from 'axios';
 
-// URL ของ API Server ของคุณ
-const API_URL = 'http://localhost:3000/api/auth/';
+// ตั้งค่า URL หลักให้ชี้ไปที่ Backend Port 3000
+const apiClient = axios.create({
+  baseURL: 'http://localhost:3000/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
 class AuthService {
-  /**
-   * เมธอดสำหรับส่งข้อมูลไปลงทะเบียนผู้ใช้ใหม่
-   * @param {object} userData - ข้อมูลผู้ใช้จากฟอร์มลงทะเบียน
-   */
-  static async register(userData) {
-    const response = await axios.post(API_URL + 'signup', userData);
-    return response.data;
+
+  // ฟังก์ชันลงทะเบียน (Register)
+  register(userData) {
+    // แปลงข้อมูลให้ตรงกับที่ Backend ต้องการ
+    const dataToSend = {
+      prefix: userData.prefix,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      email: userData.email,
+      phone: userData.phone?.replace(/-/g, ''), // ตัดขีดออก
+      password: userData.password,
+      role: userData.userType,
+      specialization: userData.licenseNumber || null,
+      workplace: userData.workplace || null,
+      department: userData.department || null,
+      position: userData.position || null
+    };
+
+    // ยิงไปที่ /auth/register (ตามที่เราทำใน Backend)
+    return apiClient.post('/auth/register', dataToSend);
   }
 
-  /**
-   * --- เพิ่มเมธอดนี้เข้าไป ---
-   * เมธอดสำหรับส่งข้อมูลไปเข้าสู่ระบบ
-   * @param {object} credentials - ข้อมูลอีเมลและรหัสผ่าน
-   */
-  static async login(credentials) {
-    // ส่งข้อมูลไปที่ endpoint 'login' ของ Backend
-    const response = await axios.post(API_URL + 'login', {
-      email: credentials.email,
-      password: credentials.password,
-    });
-
-    // เมื่อ Login สำเร็จ, Backend จะส่งข้อมูลผู้ใช้ (และอาจจะมี token) กลับมา
-    // เราจะเก็บข้อมูลนี้ไว้ใน localStorage เพื่อให้รู้ว่าผู้ใช้ Login อยู่
-    if (response.data.user) { // หรือ response.data.token ถ้ามี
-      localStorage.setItem('user', JSON.stringify(response.data));
-    }
-
-    return response.data;
+  // ฟังก์ชันเข้าสู่ระบบ (Login)
+  login(credentials) {
+    return apiClient.post('/auth/login', credentials);
   }
 
-  /**
-   * เมธอดสำหรับออกจากระบบ
-   */
-  static logout() {
+  // ฟังก์ชันเก็บข้อมูล User ลงเครื่อง
+  saveUser(user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+
+  logout() {
     localStorage.removeItem('user');
   }
 
-  /**
-   * เมธอดสำหรับดึงข้อมูลผู้ใช้ที่ Login อยู่จาก localStorage
-   */
-  static getCurrentUser() {
+  getCurrentUser() {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       return JSON.parse(userStr);
@@ -53,4 +54,5 @@ class AuthService {
   }
 }
 
-export { AuthService };
+// 🔥 สำคัญมาก: ต้อง export default new ... เพื่อให้หน้า Vue เรียกใช้ได้ทันที
+export default new AuthService();

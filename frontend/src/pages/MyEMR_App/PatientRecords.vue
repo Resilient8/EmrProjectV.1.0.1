@@ -1,22 +1,6 @@
 <template>
   <q-page class="page-container">
-    <!-- Header Section -->
-    <div class="patient-header-card list-item-animation" style="animation-delay: 0.1s;">
-      <div class="row items-center no-wrap">
-        <q-icon name="o_summarize" size="lg" class="q-mr-md header-icon" />
-        <div class="text-h5 text-weight-bold header-title">
-          สรุปข้อมูลผู้ป่วย
-        </div>
-        <q-space />
-        <q-btn flat round icon="o_arrow_back" class="primary-action-btn" @click="goBack">
-          <q-tooltip class="tooltip-glassy">กลับไปทะเบียนผู้ป่วย</q-tooltip>
-        </q-btn>
-      </div>
-    </div>
-
-    <!-- Main Content -->
     <div class="summary-column">
-      <!-- Loading Skeleton -->
       <div v-if="loading" class="list-item-animation" style="animation-delay: 0.2s;">
         <q-card class="main-card" flat>
           <q-card-section>
@@ -27,7 +11,6 @@
         </q-card>
       </div>
 
-      <!-- Error Display -->
       <div v-else-if="error" class="list-item-animation" style="animation-delay: 0.2s;">
         <q-card flat class="no-data-card main-card">
           <q-card-section class="text-center q-pa-xl">
@@ -39,11 +22,6 @@
         </q-card>
       </div>
 
-      <!--
-        [!!!] KEY CHANGE HERE [!!!]
-        We now render PatientSummary as soon as loading is false.
-        We DO NOT pass the `:patient` prop, allowing it to use its own demo data.
-      -->
       <PatientSummary v-if="!loading" class="list-item-animation" style="animation-delay: 0.2s;" />
     </div>
   </q-page>
@@ -51,10 +29,8 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { useRouter } from 'vue-router';
+// (ลบ useRouter ออกเพราะ goBack ถูกลบแล้ว)
 import PatientSummary from "./PatientSummary.vue"; // Ensure the path is correct
-
-const router = useRouter();
 
 const loading = ref(true);
 const error = ref(null);
@@ -71,51 +47,37 @@ const fetchPatientData = async () => {
   // You can add your real fetch logic here later and handle potential errors.
 };
 
-const goBack = () => {
-  router.push({ name: 'PatientRegistry' }); // Make sure this route name is correct
-}
+// (ลบ goBack function ออก)
 
 onMounted(fetchPatientData);
 </script>
 
 <style scoped lang="scss">
+/* 🚀 FIX: แก้ไขคลาสนี้ครับ */
 .page-container {
   padding: 24px;
-  background-color: #0d1a26;
+
+  /* --- 🚀 โค้ดลายเส้นถูกลบออกแล้ว --- */
+  background-color: #0d1a26; /* สีพื้นหลังหลัก */
+
   font-family: 'Sarabun', sans-serif;
   color: #e0e0e0;
 }
+/* 🚀 END FIX */
 
 .summary-column {
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.patient-header-card {
-  max-width: 1200px;
-  margin: 0 auto 24px auto;
-  background: rgba(38, 50, 56, 0.5);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid rgba(0, 184, 255, 0.2);
-  padding: 16px 24px;
-}
-
-.header-icon {
-  color: #00d4ff;
-  text-shadow: 0 0 12px #00d4ff;
-}
-
-.header-title {
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(0, 184, 255, 0.8);
-}
+/* (ลบ .patient-header-card, .header-icon, .header-title ออก) */
 
 .welcome-text {
   color: #90a4ae;
 }
 
 .primary-action-btn {
+  /* (ยังคงเก็บไว้เพราะ Error card ยังใช้) */
   border: 1px solid #00b8ff;
   color: #00b8ff;
   background: transparent;
@@ -154,6 +116,7 @@ onMounted(fetchPatientData);
 </style>
 
 <style lang="scss">
+/* (ส่วนนี้เหมือนเดิม) */
 .list-item-animation {
   opacity: 0;
   animation: floatUp 0.6s ease-out forwards;

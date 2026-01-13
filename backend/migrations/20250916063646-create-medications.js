@@ -1,34 +1,41 @@
+// backend/migrations/20250916063646-create-medications.js
+
 'use strict';
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('medications', {
-      product_id: {
-        type: Sequelize.INTEGER,
-        primaryKey: true,
+      id: {
         allowNull: false,
-        references: {
-          model: 'products', // เชื่อมกับตาราง products
-          key: 'id',
-        },
-        onDelete: 'CASCADE' // ถ้า product ถูกลบ, ข้อมูลยานี้ก็ควรถูกลบตาม
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      // 🛑 [แก้ไข] เพิ่มคอลัมน์ medication_code ที่ขาดหายไป
+      medication_code: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
       },
       generic_name: {
         type: Sequelize.STRING,
-        allowNull: true
+        allowNull: false
+      },
+      trade_name: {
+        type: Sequelize.STRING
       },
       dosage_form: {
-        type: Sequelize.STRING,
-        allowNull: true
+        type: Sequelize.STRING
       },
-      strength: {
-        type: Sequelize.STRING,
-        allowNull: true
+      price: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false
       },
-      contraindications: {
-        type: Sequelize.TEXT,
-        allowNull: true
-      }
+      stock_quantity: {
+        type: Sequelize.INTEGER,
+        allowNull: false
+      },
+      // หมายเหตุ: ละเว้น createdAt/updatedAt เพราะ Migration อื่นๆ ก็ไม่มี
     });
   },
   async down(queryInterface, Sequelize) {
