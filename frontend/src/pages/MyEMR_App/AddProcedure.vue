@@ -1058,7 +1058,7 @@ const performSave = async (statusToSave = null) => {
   }
 
   symptomDetails.value.forEach(symptom => {
-    symptomsData.push({ ChiefComplaint: symptom.name, duration: symptom.duration, level: symptom.level });
+    symptomsData.push({ ChiefComplaint: symptom.name, duration: symptom.duration, level: symptom.level,locations: symptom.locations });
   });
 
   // 🔥 จุดสำคัญ: ห่อ Symptoms ด้วย Object เพื่อส่ง nurse_id ไปด้วย
