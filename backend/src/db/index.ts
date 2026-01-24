@@ -23,6 +23,7 @@ import Product from '../models/product';
 import Medication from '../models/medications'; 
 import Prescription from '../models/prescription';
 import ICD10 from '../models/icd10'; 
+import VisitDiagnosis from '../models/visitDiagnosis'; // ✅ 1. เพิ่ม Import ตรงนี้
 
 // ===================================================
 // 2. รวม Model เข้า object db
@@ -48,7 +49,8 @@ const db: any = {
   Product,
   Medication,
   Prescription,
-  ICD10
+  ICD10,
+  VisitDiagnosis // ✅ 2. ใส่เข้า Object db
 };
 
 // ===================================================
@@ -65,27 +67,38 @@ Object.keys(db).forEach(modelName => {
 // ===================================================
 
 // --- 4.1 เคลียร์เรื่องชื่อ recordedBy ที่ชนกัน ---
-// ถ้าในไฟล์ Model มีการเขียน as: 'recordedBy' อยู่แล้ว บรรทัดข้างล่างนี้จะข้ามไปไม่ error
 try {
     if (!Visit.associations.recordedBy) {
         Visit.belongsTo(User, { as: 'recordedBy', foreignKey: 'recorder_id' });
     }
 } catch (e) { console.log("Visit association already exists"); }
 
-// --- 4.2 ตารางยา (ต้องใช้ drug_id เท่านั้น) ---
+// --- 4.2 ตารางยา ---
 try {
-    // ลบอันเดิมที่อาจจะค้างอยู่ แล้วประกาศใหม่ให้เคลียร์
     Prescription.belongsTo(Product, { foreignKey: 'drug_id', as: 'product' });
     Product.hasMany(Prescription, { foreignKey: 'drug_id', as: 'productPrescriptions' });
-    
-    // Alias สำหรับคนสั่งยา (เภสัชกรใช้ชื่อนี้)
     Prescription.belongsTo(User, { as: 'prescribedBy', foreignKey: 'prescribed_by' });
 } catch (e) { console.log("Prescription associations already exist"); }
 
-// --- 4.3 ตารางอื่นๆ (ใช้ชื่อเฉพาะทางเพื่อไม่ให้ซ้ำ) ---
+// --- 4.3 ตารางอื่นๆ ---
 try {
     VitalSign.belongsTo(User, { as: 'vitalsRecorder', foreignKey: 'recorded_by' });
     VisitSymptom.belongsTo(User, { as: 'symptomRecorder', foreignKey: 'recorded_by' });
 } catch (e) { console.log("Other associations already exist"); }
+
+// --- ✅ 4.4 เพิ่มความสัมพันธ์ให้ VisitDiagnosis (สำคัญมาก!) ---
+try {
+    // 1. Visit <-> VisitDiagnosis
+    Visit.hasMany(VisitDiagnosis, { foreignKey: 'visit_id', as: 'icd10_diagnoses' });
+    VisitDiagnosis.belongsTo(Visit, { foreignKey: 'visit_id', as: 'visit' });
+
+    // 2. VisitDiagnosis <-> ICD10 (ดึงชื่อโรค)
+    // 🔥 targetKey: 'code' สำคัญมาก เพราะเราเชื่อมด้วยรหัสโรค (String) ไม่ใช่ ID (Int)
+    VisitDiagnosis.belongsTo(ICD10, { foreignKey: 'icd10_code', targetKey: 'code', as: 'icd10_detail' });
+
+    // 3. Audit Trail (หมอคนไหนวินิจฉัย)
+    VisitDiagnosis.belongsTo(User, { foreignKey: 'doctor_id', as: 'diagnosedBy' });
+
+} catch (e) { console.error("VisitDiagnosis association error:", e); }
 
 export default db;

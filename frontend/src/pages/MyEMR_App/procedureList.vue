@@ -407,12 +407,29 @@ const openImagePreview = (url) => {
 
 // --- Data Fetching Logic ---
 
+// 🔥 Function: ดึงวันที่ที่มีคิว (ฉบับแก้บั๊ก Admin)
 const fetchActiveDates = async () => {
     try {
-        // ดึงวันที่ที่มีคิวตรวจของหมอคนนี้
+        const params = {};
+
+        // 🔥 แก้ตรงนี้: ดึง Role จาก user ด้วย
+        const rawRole = authStore.role || authStore.user?.role;
+        const userRole = rawRole ? rawRole.toLowerCase() : '';
+
+        console.log(`🧐 Debug ActiveDates | Raw: "${rawRole}" | Lower: "${userRole}"`);
+
+        // เช็คเงื่อนไข
+        if (userRole !== 'admin') {
+            console.log('🔒 Not Admin -> Filter by ID:', authStore.userId);
+            params.doctor_id = authStore.userId;
+        } else {
+            console.log('🔓 Is Admin -> Show All Dates');
+        }
+
         const res = await axios.get('http://localhost:3000/api/doctors/active-dates', {
-            params: { doctor_id: authStore.userId } // 🔥 ส่ง ID หมอไปกรองด้วย
+            params
         });
+
         if (Array.isArray(res.data)) {
             activeDatesSet.value = new Set(res.data.map(d => date.formatDate(d, 'YYYY-MM-DD')));
         }
@@ -484,7 +501,7 @@ const selectedDateLabel = computed(() => {
     return date.formatDate(d, 'D MMM YYYY', thaiDateLocale);
 });
 
-// 🔥 Function หลัก: ดึงคิวหมอ
+// 🔥 Function หลัก: ดึงคิวหมอ (ฉบับสมบูรณ์: แก้ Admin + บังคับจุดเขียว + รีเฟรช Dropdown)
 const fetchDoctorQueue = async (isBackground = false) => {
   if (!selectedDate.value || selectedDate.value === 'custom') return;
   if (!isBackground) loading.value = true;
@@ -495,93 +512,87 @@ const fetchDoctorQueue = async (isBackground = false) => {
         params.date = selectedDate.value;
     }
 
-    // 🔥 ส่ง ID หมอไปด้วย (สำคัญมากในการกรองคิว)
-    params.doctor_id = authStore.userId;
+    // 1. Logic ดึง Role
+    const rawRole = authStore.role || authStore.user?.role;
+    const userRole = rawRole ? rawRole.toLowerCase() : '';
+    console.log(`🧐 Debug Queue | Checking Role: "${userRole}"`);
+
+    if (userRole !== 'admin') {
+        params.doctor_id = authStore.userId;
+    } else {
+        console.log('🔓 Queue Filter: Admin Mode (Show All)');
+    }
 
     const response = await axios.get('http://localhost:3000/api/doctors/patient-queue', { params });
 
-    // ตรวจสอบว่ามีข้อมูลส่งมาหรือไม่
     if (!response.data || !Array.isArray(response.data)) {
         patientQueue.value = [];
         return;
     }
 
+    // =========================================================
+    // 🟢 FIX: บังคับอัปเดตปฏิทิน + รีเฟรช Dropdown
+    // =========================================================
+    if (response.data.length > 0 && selectedDate.value !== 'all') {
+        const currentStr = selectedDate.value;
+        // ถ้าใน Set ยังไม่มีวันนี้ ให้เพิ่มเข้าไป
+        if (!activeDatesSet.value.has(currentStr)) {
+            console.log(`🟢 Force adding active date: ${currentStr}`);
+            const newSet = new Set(activeDatesSet.value);
+            newSet.add(currentStr);
+            activeDatesSet.value = newSet;
+
+            // 🔥🔥🔥 เพิ่มบรรทัดนี้ครับ! สั่งให้วาด Dropdown ใหม่เดี๋ยวนี้! 🔥🔥🔥
+            generateDateOptions();
+        }
+    }
+    // =========================================================
+
     patientQueue.value = response.data.map(raw => {
-        // 1. จัดการข้อมูลอาการสำคัญ (Chief Complaint)
         let symptomsList = '';
         if (Array.isArray(raw.symptoms)) {
-             symptomsList = raw.symptoms
-                .map(s => s.symptom?.symptom_name || s.symptom_name)
-                .filter(Boolean)
-                .join(', ');
+             symptomsList = raw.symptoms.map(s => s.symptom?.symptom_name || s.symptom_name).filter(Boolean).join(', ');
         }
-
-        // ถ้าไม่มีอาการจากตาราง symptoms ให้ใช้ chief_complaint หรือ notes แทน
         const cc = symptomsList || raw.chief_complaint || raw.notes || '-';
 
-        // 2. จัดการรูปภาพ (Avatar URL)
-        // ใช้ raw.avatar_url ที่ Backend รวมมาให้แล้ว
         let rawAvatarPath = raw.avatar_url;
         let avatarUrl = null;
         if (rawAvatarPath) {
             let cleanPath = rawAvatarPath.replace(/\\/g, '/');
-            if (!cleanPath.startsWith('/') && !cleanPath.startsWith('http')) {
-                cleanPath = '/' + cleanPath;
-            }
-            if (cleanPath.startsWith('http')) {
-                avatarUrl = cleanPath;
-            } else {
-                avatarUrl = `http://localhost:3000${cleanPath}`;
-            }
-            // ป้องกัน Cache รูปภาพ
-            avatarUrl += `?t=${Date.now()}`;
+            if (!cleanPath.startsWith('/') && !cleanPath.startsWith('http')) cleanPath = '/' + cleanPath;
+            avatarUrl = cleanPath.startsWith('http') ? cleanPath : `http://localhost:3000${cleanPath}`;
+             avatarUrl += `?t=${Date.now()}`;
         }
 
-        // 3. จัดการเรื่องเวลา (Display Time)
         const visitDate = new Date(raw.visit_datetime);
         const displayTime = selectedDate.value === 'all'
             ? visitDate.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
             : visitDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
-        // 4. 🔥 Mapping ข้อมูลเข้าสู่ Object ที่ Frontend ใช้
         return {
-            ...raw, // เก็บค่าเดิมจาก Backend ไว้ทั้งหมด
+            ...raw,
             id: raw.visit_id,
             visit_id: raw.visit_id,
-
-            // ✅ แก้ปัญหาชื่อ undefined:
-            // เปลี่ยนจากเดิมที่ต่อชื่อเอง มาใช้ raw.name ที่ Backend รวมมาให้แล้ว
             patientName: raw.name || 'ไม่ระบุชื่อ',
-
-            // ใช้ HN (Patient ID) จาก Backend
             patientId: raw.patient_id_string || raw.patient_id || 'N/A',
-
             arrivalTime: displayTime,
             originalTime: raw.visit_datetime,
             chiefComplaint: cc,
             avatarUrl: avatarUrl,
             status: raw.status,
-            age: raw.age || '-', // ใช้ค่าอายุที่ Backend คำนวณมาให้แล้ว
-
-            // Mapping ข้อมูลสัญญาณชีพ (Vital Signs)
+            age: raw.age || '-',
             temperature: raw.temperature || (raw.vitalSign?.temperature),
             pulse: raw.pulse || (raw.vitalSign?.pulse),
-            // รวมความดันตัวบน/ตัวล่าง
             bp: raw.bp || (raw.vitalSign ? `${raw.vitalSign.blood_pressure_systolic}/${raw.vitalSign.blood_pressure_diastolic}` : null)
         };
     });
 
-    console.log(`✅ Updated frontend queue with ${patientQueue.value.length} patients.`);
+   const totalVisits = response.data.length;           // จำนวนครั้งที่ตรวจ
+    const totalUniquePatients = groupedPatients.value.length; // จำนวนคนจริงๆ
 
+    console.log(`✅ Updated frontend: Found ${totalUniquePatients} patients (Total ${totalVisits} visits).`);
   } catch (error) {
     console.error('Error fetching queue:', error);
-    if (!isBackground) {
-        $q.notify({
-            type: 'negative',
-            message: 'โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
-            position: 'top'
-        });
-    }
   } finally {
     if (!isBackground) loading.value = false;
   }
@@ -628,15 +639,26 @@ const paginatedPatients = computed(() => {
     return groupedPatients.value.slice(start, start + rowsPerPage.value);
 });
 
+// 📍 จุดที่ 1: แก้ไขเพื่อให้ปุ่ม Filter นับจำนวน "คน" (Unique Patients)
 const statusFilterOptions = computed(() => {
-    const rawCounts = {};
-    patientQueue.value.forEach(p => { rawCounts[p.status] = (rawCounts[p.status] || 0) + 1; });
+    // 1. สร้าง Object เพื่อเก็บจำนวนคนแยกตามสถานะ
+    const countsByStatus = {};
+
+    // 2. ใช้ groupedPatients (ตัวแปรที่ยุบรวมคนไข้มาแล้ว) มานับจำนวนคน
+    groupedPatients.value.forEach(patient => {
+        const status = patient.status;
+        countsByStatus[status] = (countsByStatus[status] || 0) + 1;
+    });
+
+    // 3. ส่งข้อมูลกลับไปวาดปุ่มพร้อมตัวเลขที่ถูกต้อง
     return statusOptions.value.map(opt => ({
         ...opt,
-        count: opt.value === null ? patientQueue.value.length : (rawCounts[opt.value] || 0)
+        // ถ้าเป็นปุ่ม "ทั้งหมด" ให้ใช้จำนวนคนรวม / ถ้าเป็นสถานะอื่น ให้นับจำนวนคนในสถานะนั้น
+        count: opt.value === null
+            ? groupedPatients.value.length
+            : (countsByStatus[opt.value] || 0)
     }));
 });
-
 watch([searchQuery, statusFilter], () => { currentPage.value = 1; });
 
 // --- Navigation ---

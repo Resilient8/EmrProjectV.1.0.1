@@ -18,26 +18,31 @@
             </div>
 
             <div class="col-auto row items-center">
-               <div class="column items-end q-mr-md gt-xs">
-                  <div class="text-caption text-grey-4">ความสมบูรณ์ของข้อมูล</div>
-                  <div class="text-caption text-cyan-3 text-weight-bold">{{ (formProgress * 100).toFixed(0) }}%</div>
-               </div>
-               <q-circular-progress
-                  show-value
-                  font-size="12px"
-                  :value="formProgress * 100"
-                  size="50px"
-                  :thickness="0.22"
-                  color="cyan-3"
-                  track-color="grey-8"
-                  class="q-mr-md"
-                >
-                  {{ (formProgress * 100).toFixed(0) }}%
-                </q-circular-progress>
+              <div class="column items-end q-mr-md gt-xs">
+                <div class="text-caption text-grey-4">ความสมบูรณ์ของข้อมูล</div>
+                <div class="text-caption text-cyan-3 text-weight-bold">{{ (formProgress * 100).toFixed(0) }}%</div>
+              </div>
 
-                <q-btn flat round icon="history" color="grey-4" @click="toggleHistory">
-                  <q-tooltip class="bg-black">ประวัติการบันทึก</q-tooltip>
-                </q-btn>
+              <q-circular-progress
+                show-value
+                font-size="12px"
+                :value="formProgress * 100"
+                size="50px"
+                :thickness="0.22"
+                color="cyan-3"
+                track-color="grey-8"
+                class="q-mr-md"
+              >
+                {{ (formProgress * 100).toFixed(0) }}%
+              </q-circular-progress>
+
+              <q-btn flat round icon="delete_sweep" color="red-4" class="q-mr-sm" @click="confirmClearAll">
+                <q-tooltip class="bg-red text-white">ล้างข้อมูลทั้งหมด (Reset Form)</q-tooltip>
+              </q-btn>
+
+              <q-btn flat round icon="history" color="grey-4" @click="toggleHistory">
+                <q-tooltip class="bg-black">ประวัติการบันทึก</q-tooltip>
+              </q-btn>
             </div>
 
           </div>
@@ -413,19 +418,19 @@
 
       <q-dialog v-model="bodyPartDialog.show">
           <q-card class="glass-panel" style="width: 400px;">
-              <q-card-section class="bg-white-05 text-white">
-                  <div class="text-h6">อาการ: {{ bodyPartDialog.title }}</div>
-              </q-card-section>
-              <q-card-section>
-                  <div class="text-subtitle2 text-grey-4 q-mb-sm">ระดับ:</div>
-                  <q-option-group v-model="bodyPartDialog.level" :options="painLevelOptions" color="cyan-3" type="radio" dark inline class="q-mb-md" />
-                  <div class="text-subtitle2 text-grey-4 q-mb-sm">อาการ:</div>
-                  <q-option-group v-model="bodyPartDialog.selected" :options="bodyPartDialog.options" color="cyan-3" type="checkbox" dark />
-              </q-card-section>
-              <q-card-actions align="right">
-                  <q-btn flat label="ยกเลิก" v-close-popup color="grey-5" />
-                  <q-btn label="ยืนยัน" color="cyan-6" @click="addSymptomsFromModel" v-close-popup :disable="bodyPartDialog.selected.length === 0" unelevated/>
-              </q-card-actions>
+            <q-card-section class="bg-white-05 text-white">
+                <div class="text-h6">อาการ: {{ bodyPartDialog.title }}</div>
+            </q-card-section>
+            <q-card-section>
+                <div class="text-subtitle2 text-grey-4 q-mb-sm">ระดับ:</div>
+                <q-option-group v-model="bodyPartDialog.level" :options="painLevelOptions" color="cyan-3" type="radio" dark inline class="q-mb-md" />
+                <div class="text-subtitle2 text-grey-4 q-mb-sm">อาการ:</div>
+                <q-option-group v-model="bodyPartDialog.selected" :options="bodyPartDialog.options" color="cyan-3" type="checkbox" dark />
+            </q-card-section>
+            <q-card-actions align="right">
+                <q-btn flat label="ยกเลิก" v-close-popup color="grey-5" />
+                <q-btn label="ยืนยัน" color="cyan-6" @click="addSymptomsFromModel" v-close-popup :disable="bodyPartDialog.selected.length === 0" unelevated/>
+            </q-card-actions>
           </q-card>
       </q-dialog>
 
@@ -501,7 +506,30 @@ const playRemoveSound = () => {
   isRemoving = true;
   setTimeout(() => { isRemoving = false; }, 50);
 };
+const confirmClearAll = () => {
+  playClickSound(); // เสียงคลิก
 
+  $q.dialog({
+    title: 'ยืนยันการล้างข้อมูล',
+    message: 'คุณต้องการล้างข้อมูลทั้งหมดในหน้านี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้',
+    cancel: true,
+    persistent: true,
+    ok: { label: 'ล้างข้อมูลทันที', color: 'red-6', unelevated: true, icon: 'delete_forever' },
+    cancel: { label: 'ยกเลิก', color: 'grey', flat: true },
+    dark: true,
+    class: 'glass-panel' // ใช้ธีมกระจกเดียวกับหน้าเว็บ
+  }).onOk(() => {
+    clearForm(); // เรียกใช้ฟังก์ชัน clearForm เดิมที่มีอยู่แล้ว
+
+    // แจ้งเตือนเมื่อล้างเสร็จ
+    $q.notify({
+      type: 'positive',
+      message: 'ล้างข้อมูลเรียบร้อยแล้ว พร้อมสำหรับเคสใหม่',
+      icon: 'cleaning_services',
+      position: 'top'
+    });
+  });
+};
 // =========================
 // 2. MAIN LOGIC
 // =========================

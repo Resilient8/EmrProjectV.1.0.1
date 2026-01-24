@@ -14,6 +14,7 @@ import pharmacistRoutes from './routes/pharmacist.routes';
 import medicationRoutes from './routes/medication.route';
 import icd10Routes from './routes/icd10.route'; 
 import userRoutes from './routes/user.route'; 
+import visitDiagnosisRoutes from './routes/visitDiagnosis.route'; // ✅
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -31,27 +32,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // =========================================================
-// 🔥 2. BEAUTIFIED LOGGING MIDDLEWARE (ฉบับปรับปรุง)
+// 🔥 2. LOGGING MIDDLEWARE (แบบสะอาดตา)
 // =========================================================
 app.use((req, res, next) => {
-    // รายชื่อเส้นทางที่จะ "ซ่อน" Log เพราะทำงานบ่อยเกินไป (เช่น Auto Save หรือ Refresh Queue)
     const silentPaths = ['/masterdata', '/patient-queue', '/details', '/uploads', '/prescriptions/visit'];
     const isSilentPath = silentPaths.some(path => req.url.includes(path));
-    
-    // เงื่อนไข: 
-    // - ถ้าเป็น GET และอยู่ใน silentPaths => ไม่ต้องโชว์
-    // - ถ้าเป็น POST, PUT, DELETE => โชว์เสมอ (เพราะเป็นการเปลี่ยนข้อมูลสำคัญ)
     const isWriteOperation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
 
     if (!isSilentPath || isWriteOperation) {
         const timestamp = new Date().toLocaleTimeString('th-TH');
+        // ✅ เหลือแค่นี้พอ: บอกเวลา + ยิงไปไหน (สั้นๆ)
         console.log(`\n[${timestamp}] 🚀 ${req.method} -> ${req.url}`);
-
-        // ถ้ามีการส่ง Data (Body) มา และเป็นคำสั่งบันทึก ให้โชว์ข้อมูลแค่พอประมาณ
-        if (isWriteOperation && Object.keys(req.body).length > 0) {
-            console.log(`📦 Payload:`, JSON.stringify(req.body, null, 2));
-            console.log(`-----------------------------------`);
-        }
     }
     next();
 });
@@ -72,6 +63,7 @@ app.use('/api/pharmacist', pharmacistRoutes);
 app.use('/api/medications', medicationRoutes);
 app.use('/api/icd10', icd10Routes); 
 app.use('/api/users', userRoutes);
+app.use('/api/visit-diagnoses', visitDiagnosisRoutes); // ✅
 
 // =========================================================
 // 4. DATABASE SYNC & SERVER START

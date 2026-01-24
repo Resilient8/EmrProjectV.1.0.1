@@ -89,39 +89,73 @@
         <div class="layout-container">
 
           <div class="internal-header-bar">
-            <q-item class="patient-header-item" @mouseenter="showPatientMenu = true; throttledPlayHoverSound();" @mouseleave="showPatientMenu = false">
-              <q-item-section avatar>
-                <q-avatar v-if="activePatient && activePatient.avatarUrl" size="36px"><img :src="activePatient.avatarUrl"></q-avatar>
-                <q-avatar v-else size="36px" color="primary" text-color="white" :icon="activePatientGender"></q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <div class="text-weight-bold text-white">{{ visitData.patientInfo.name }}</div>
-                <div class="text-caption text-cyan-2">ID: {{ visitData.patientInfo.patientId }}</div>
-              </q-item-section>
+            <div class="row items-center">
+              <q-item class="patient-header-item clickable-hover" @click="showPatientMenu = true">
+                <q-item-section avatar>
+                  <q-avatar v-if="activePatient && activePatient.avatarUrl" size="36px" class="shadow-1">
+                    <img :src="activePatient.avatarUrl">
+                  </q-avatar>
+                  <q-avatar v-else size="36px" color="cyan-8" text-color="white" :icon="activePatientGender"></q-avatar>
+                </q-item-section>
+                <q-item-section>
+                  <div class="text-weight-bold text-white text-subtitle2">{{ visitData?.patientInfo?.name || 'กำลังโหลด...' }}</div>
+                  <div class="text-caption text-cyan-2">HN: {{ visitData?.patientInfo?.patientId }}</div>
+                </q-item-section>
 
-              <q-menu v-model="showPatientMenu" anchor="bottom start" self="top start" :offset="[0, 10]" class="bg-transparent no-shadow">
-                <q-card class="glass-dialog popover-card" style="min-width: 350px;">
-                    <q-card-section class="q-pa-md">
-                      <div class="row items-center q-mb-md">
-                          <q-avatar size="50px" color="primary" text-color="white" class="q-mr-md shadow-3">{{ visitData.patientInfo.name.charAt(0) }}</q-avatar>
-                          <div>
-                            <div class="text-h6 text-white leading-tight">{{ visitData.patientInfo.name }}</div>
-                            <div class="text-caption text-grey-4">อายุ: {{ visitData.patientInfo.age }} ปี | เพศ: {{ visitData.patientInfo.gender }}</div>
+                <q-menu v-model="showPatientMenu" anchor="bottom start" self="top start" class="bg-transparent no-shadow">
+                   <q-card class="glass-dialog popover-card" style="min-width: 350px;">
+                      <q-card-section class="q-pa-md">
+                          <div class="row items-center q-mb-md">
+                              <q-avatar size="50px" color="primary" text-color="white" class="q-mr-md shadow-3">{{ visitData?.patientInfo?.name?.charAt(0) }}</q-avatar>
+                              <div>
+                                <div class="text-h6 text-white leading-tight">{{ visitData?.patientInfo?.name }}</div>
+                                <div class="text-caption text-grey-4">อายุ: {{ visitData?.patientInfo?.age }} ปี</div>
+                              </div>
                           </div>
-                      </div>
-                      <q-separator dark class="q-mb-md opacity-20"/>
-                      <div class="info-row q-mb-sm"><q-icon name="badge" class="q-mr-sm text-cyan-3"/><span class="text-grey-4">ID:</span> <span class="text-white q-ml-xs">{{ visitData.patientInfo.patientId }}</span></div>
-                      <div class="bg-dark-translucent rounded-borders q-pa-sm q-mt-sm">
-                          <div class="row items-center q-mb-xs"><q-icon name="warning" color="red-4" class="q-mr-sm"/><span class="text-red-4 text-weight-bold">แพ้ยา:</span><span class="text-white q-ml-sm">{{ visitData.patientInfo.allergies || 'ไม่มี' }}</span></div>
-                          <div class="row items-center"><q-icon name="medical_information" color="orange-4" class="q-mr-sm"/><span class="text-orange-4 text-weight-bold">โรคประจำตัว:</span><span class="text-white q-ml-sm">{{ visitData.patientInfo.underlyingDisease || 'ไม่มี' }}</span></div>
-                      </div>
-                    </q-card-section>
-                </q-card>
-              </q-menu>
-            </q-item>
+                          </q-card-section>
+                   </q-card>
+                </q-menu>
+              </q-item>
 
-            <div class="row q-gutter-x-md items-center">
-              <div class="row items-center q-mr-sm transition-all" style="min-width: 140px; justify-content: flex-end;">
+              <div class="q-ml-md" v-if="activePatient?.visits?.length > 1">
+                <q-btn-dropdown
+                  flat
+                  dense
+                  no-caps
+                  content-class="glass-menu"
+                  :label="`Visit: ${formatVisitLabel(visitData?.visit)}`"
+                  icon="event_available"
+                  color="cyan-3"
+                >
+                  <q-list dark separator style="min-width: 250px">
+                    <q-item-label header class="text-grey-4 text-caption">ประวัติการมารับบริการ</q-item-label>
+                    <q-item
+                      v-for="v in activePatient.visits"
+                      :key="v.visit_id"
+                      clickable
+                      v-close-popup
+                      @click="switchVisitInPage(v.visit_id)"
+                      :active="v.visit_id == route.query.visitId"
+                      active-class="bg-cyan-9 text-white"
+                    >
+                      <q-item-section avatar>
+                        <q-icon :name="v.visit_id == route.query.visitId ? 'radio_button_checked' : 'radio_button_unchecked'" size="xs" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label>{{ formatTime(v.visit_datetime) }} น.</q-item-label>
+                        <q-item-label caption class="text-grey-5">{{ formatDateTh(v.visit_datetime) }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-chip :color="getStatusColor(v.status)" text-color="white" size="xs">{{ v.status }}</q-chip>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-btn-dropdown>
+              </div>
+            </div>
+
+            <div class="row q-gutter-x-sm items-center">
+              <div class="row items-center q-mr-sm transition-all" style="min-width: 120px; justify-content: flex-end;">
                 <div v-if="isAutoSaving" class="row items-center text-caption text-accent fade-in">
                     <q-spinner-dots size="1.2em" class="q-mr-xs"/> กำลังบันทึก...
                 </div>
@@ -130,11 +164,14 @@
                 </div>
               </div>
 
+              <q-btn flat round color="red-4" icon="delete_sweep" @click="confirmClearData">
+                <q-tooltip class="bg-red-9">ล้างข้อมูลที่กรอกทั้งหมด</q-tooltip>
+              </q-btn>
+
               <q-chip dense :icon="statusIcon" :label="pageStatus" class="status-pill" :class="statusChipClass" />
 
               <div class="control-buttons-group">
                   <q-btn class="premium-btn btn-cert" icon="description" label="ใบรับรอง" @click="openCertificateDialog" unelevated />
-
                   <q-btn class="premium-btn btn-save" icon="save" label="บันทึก" @click="saveProgress" unelevated />
                   <q-btn class="premium-btn btn-complete" icon="check_circle" label="เสร็จสิ้น" @click="confirmTreatmentComplete" unelevated />
               </div>
@@ -259,26 +296,95 @@
                           </div>
 
                           <div class="section-box q-mb-lg">
-                              <div class="text-h6 text-green-4 q-mb-md row items-center"><q-icon name="assignment_turned_in" class="q-mr-sm"/>แผนการรักษา (Plan)</div>
-                              <div class="q-mb-md">
-                                  <div class="text-subtitle2 text-grey-4 q-mb-xs">แผนการรักษา / การส่งตัว</div>
-                                  <q-select
+                            <div class="text-h6 text-green-4 q-mb-md row items-center">
+                                <q-icon name="assignment_turned_in" class="q-mr-sm"/>แผนการรักษา (Treatment Plan)
+                            </div>
+
+                            <div class="q-mb-md">
+                                <div class="text-subtitle2 text-grey-4 q-mb-xs">แผนกที่ส่งตัว (Referral Department)</div>
+                                <div class="bg-dark-translucent q-pa-md rounded-borders border-light row items-center">
+                                    <q-icon name="meeting_room" color="orange-4" class="q-mr-sm"/>
+                                    <div class="text-h6 text-white">{{ visitData?.visit?.referral_department || '-' }}</div>
+                                    <q-chip v-if="visitData?.visit?.referral_department" size="sm" color="orange-9" text-color="white" class="q-ml-md" icon="lock">Nurse Input</q-chip>
+                                </div>
+                            </div>
+
+                            <div class="q-mb-md">
+    <div class="text-subtitle2 text-cyan-3 q-mb-xs row items-center">
+        <q-icon name="assignment" class="q-mr-xs" size="xs"/>
+        แผนการรักษาของแพทย์ (Doctor's Plan)
+    </div>
+
+    <q-select
+        dark outlined
+        v-model="assessmentPlan.plan"
+        @update:model-value="handleAutoSave"
+        :options="filteredPlanOptions"
+        use-input
+        multiple
+        use-chips
+        stack-label
+
+        label="พิมพ์แผนการรักษา แล้วกด Enter"
+
+        @filter="filterPlan"
+        new-value-mode="add-unique"
+        input-debounce="0"
+
+        class="custom-input glass-input"
+        popup-content-class="glass-menu"
+        bg-color="transparent"
+    >
+        <template v-slot:prepend>
+            <q-icon name="edit_note" color="cyan-3" class="opacity-80"/>
+        </template>
+
+        <template v-slot:no-option>
+            <q-item>
+                <q-item-section class="text-grey">
+                    ไม่พบข้อมูล - กด Enter เพื่อเพิ่มใหม่
+                </q-item-section>
+            </q-item>
+        </template>
+    </q-select>
+
+    <div v-if="assessmentPlan.plan.length > 0" class="q-mt-sm bg-dark-translucent rounded-borders q-pa-sm border-light animate-fade">
+        <q-list dense separator dark>
+            <q-item v-for="(item, idx) in assessmentPlan.plan" :key="idx" class="q-py-sm hover-effect">
+
+                <q-item-section avatar style="min-width: 40px;">
+                    <q-avatar size="24px" color="cyan-9" text-color="white" font-size="12px" class="shadow-1">
+                        {{ idx + 1 }}
+                    </q-avatar>
+                </q-item-section>
+
+                <q-item-section class="text-body2 text-white">
+                    {{ item }}
+                </q-item-section>
+
+                <q-item-section side>
+                    <q-btn flat round dense icon="close" color="red-4" size="sm" @click="removePlanItem(idx)">
+                        <q-tooltip>ลบรายการนี้</q-tooltip>
+                    </q-btn>
+                </q-item-section>
+
+            </q-item>
+        </q-list>
+    </div>
+</div>
+
+                            <div>
+                                <div class="text-subtitle2 text-grey-4 q-mb-xs">บันทึกเพิ่มเติม (Note)</div>
+                                <q-input
                                     dark outlined
-                                    v-model="assessmentPlan.plan"
-                                    @update:model-value="handleAutoSave"
-                                    :options="filteredPlanOptions"
-                                    use-input
-                                    label="เลือกแผนการรักษา"
-                                    @filter="filterPlan"
-                                    new-value-mode="add-unique"
+                                    v-model="referralNotes"
+                                    type="textarea"
+                                    rows="3"
+                                    label="ระบุคำแนะนำ หรือหมายเหตุเพิ่มเติม..."
                                     class="custom-input"
-                                  />
-                              </div>
-                              <div>
-                                  <div class="text-subtitle2 text-grey-4 q-mb-xs">คำแนะนำแพทย์เพิ่มเติม (Doctor's Note)</div>
-                                  <q-input dark outlined v-model="referralNotes" type="textarea" rows="3" label="ระบุคำแนะนำ หรือหมายเหตุเพิ่มเติม..." class="custom-input"/>
-                              </div>
-                          </div>
+                                />
+                            </div>
+                        </div>
 
                           <div class="section-box">
                               <div class="text-h6 text-cyan-3 q-mb-md row items-center"><q-icon name="medical_services" class="q-mr-sm"/>บริการและหัตถการ</div>
@@ -361,37 +467,132 @@
 
                     <q-tab-panel name="summary" class="q-pa-none fit">
                         <q-scroll-area class="fit q-pa-lg">
-                          <div class="section-box fit">
-                              <div class="row items-center justify-between q-mb-md">
-                                <div class="text-h6 text-white"><q-icon name="assignment" class="q-mr-sm text-yellow-4"/>สรุปผลการรักษา</div>
-                                <q-tabs v-model="summaryTab" dense class="text-grey-5" active-color="accent" indicator-color="accent">
-                                    <q-tab name="all" label="ภาพรวม" />
-                                    <q-tab name="diagnosis" label="เฉพาะวินิจฉัย" />
-                                    <q-tab name="services" label="เฉพาะบริการ" />
-                                </q-tabs>
+
+                          <div class="row items-center justify-between q-mb-lg">
+                              <div class="text-h5 text-white row items-center">
+                                  <q-icon name="dashboard" class="q-mr-sm text-cyan-3"/>
+                                  สรุปข้อมูลการรักษา (Summary Dashboard)
                               </div>
-                              <q-separator dark class="q-mb-md opacity-20"/>
-                              <q-tab-panels v-model="summaryTab" animated class="bg-transparent">
-                                <q-tab-panel name="all" class="q-pa-none">
-                                    <q-table dark flat bordered :rows="summaryAllData" :columns="summaryAllColumns" row-key="id" hide-bottom class="glass-table" :pagination="{ rowsPerPage: 0 }">
-                                      <template v-slot:body-cell-category="props"><q-td :props="props" style="width: 150px;"><q-chip :color="props.row.color" text-color="white" dense size="sm" class="text-weight-bold full-width justify-center">{{ props.value }}</q-chip></q-td></template>
-                                      <template v-slot:body-cell-value="props"><q-td :props="props" class="text-white">{{ props.value }}</q-td></template>
-                                    </q-table>
-                                </q-tab-panel>
-                                <q-tab-panel name="diagnosis" class="q-pa-none">
-                                    <q-list bordered separator dark class="rounded-borders border-light bg-dark-glass">
-                                      <q-item v-if="summaryDiagnosis.length === 0" class="text-grey-5 flex flex-center">ไม่มีข้อมูล</q-item>
-                                      <q-item v-for="d in summaryDiagnosis" :key="d.id"><q-item-section avatar><q-icon name="biotech" color="red-4"/></q-item-section><q-item-section>{{ d.value }}</q-item-section></q-item>
-                                    </q-list>
-                                </q-tab-panel>
-                                <q-tab-panel name="services" class="q-pa-none">
-                                    <q-list bordered separator dark class="rounded-borders border-light bg-dark-glass">
-                                      <q-item v-if="summaryServices.length === 0" class="text-grey-5 flex flex-center">ไม่มีข้อมูล</q-item>
-                                      <q-item v-for="s in summaryServices" :key="s.id"><q-item-section avatar><q-icon name="medical_services" color="green-4"/></q-item-section><q-item-section>{{ s.value }}</q-item-section></q-item>
-                                    </q-list>
-                                </q-tab-panel>
-                              </q-tab-panels>
+                              <div class="text-caption text-grey-4">ตรวจสอบและแก้ไขข้อมูลก่อนบันทึก</div>
                           </div>
+
+                          <div class="row q-col-gutter-lg">
+
+                              <div class="col-12 col-md-6">
+                                  <q-card class="bg-dark-glass border-light shadow-2 full-height">
+                                      <q-card-section class="bg-dark-translucent border-bottom-light row items-center justify-between">
+                                          <div class="text-subtitle1 text-pink-3"><q-icon name="biotech" class="q-mr-sm"/>การวินิจฉัย</div>
+                                          <q-badge color="pink-9" text-color="pink-1" rounded>{{ assessmentPlan.diagnosis.length }} รายการ</q-badge>
+                                      </q-card-section>
+
+                                      <q-list separator dark class="q-py-sm">
+                                          <div v-if="assessmentPlan.diagnosis.length === 0" class="text-grey-6 text-center q-pa-md">ไม่มีข้อมูล</div>
+                                          <q-item v-for="(item, idx) in assessmentPlan.diagnosis" :key="idx" class="hover-effect">
+                                              <q-item-section avatar>
+                                                  <q-avatar size="24px" color="pink-9" text-color="white" font-size="12px">{{ idx + 1 }}</q-avatar>
+                                              </q-item-section>
+                                              <q-item-section class="text-white">{{ item }}</q-item-section>
+                                              <q-item-section side>
+                                                  <q-btn flat round dense icon="delete_outline" color="red-4" @click="removeDiagnosisItem(idx)">
+                                                      <q-tooltip>ลบรายการนี้</q-tooltip>
+                                                  </q-btn>
+                                              </q-item-section>
+                                          </q-item>
+                                      </q-list>
+                                  </q-card>
+                              </div>
+
+                              <div class="col-12 col-md-6">
+                                  <q-card class="bg-dark-glass border-light shadow-2 full-height">
+                                      <q-card-section class="bg-dark-translucent border-bottom-light row items-center justify-between">
+                                          <div class="text-subtitle1 text-cyan-3"><q-icon name="assignment" class="q-mr-sm"/>แผนการรักษา</div>
+                                          <q-badge color="cyan-9" text-color="cyan-1" rounded>{{ assessmentPlan.plan.length }} รายการ</q-badge>
+                                      </q-card-section>
+
+                                      <q-list separator dark class="q-py-sm">
+                                          <div v-if="assessmentPlan.plan.length === 0" class="text-grey-6 text-center q-pa-md">ไม่มีข้อมูล</div>
+                                          <q-item v-for="(item, idx) in assessmentPlan.plan" :key="idx" class="hover-effect">
+                                              <q-item-section avatar>
+                                                  <q-icon name="check_circle" color="cyan-5" size="xs"/>
+                                              </q-item-section>
+                                              <q-item-section class="text-white">{{ item }}</q-item-section>
+                                              <q-item-section side>
+                                                  <q-btn flat round dense icon="delete_outline" color="red-4" @click="removePlanItem(idx)">
+                                                      <q-tooltip>ลบรายการนี้</q-tooltip>
+                                                  </q-btn>
+                                              </q-item-section>
+                                          </q-item>
+                                      </q-list>
+                                  </q-card>
+                              </div>
+
+                              <div class="col-12 col-md-6">
+                                  <q-card class="bg-dark-glass border-light shadow-2 full-height">
+                                      <q-card-section class="bg-dark-translucent border-bottom-light row items-center justify-between">
+                                          <div class="text-subtitle1 text-orange-3"><q-icon name="medication" class="q-mr-sm"/>ใบสั่งยา</div>
+                                          <q-badge color="orange-9" text-color="orange-1" rounded>{{ prescriptions.length }} รายการ</q-badge>
+                                      </q-card-section>
+
+                                      <q-list separator dark class="q-py-sm">
+                                          <div v-if="prescriptions.length === 0" class="text-grey-6 text-center q-pa-md">ไม่มีข้อมูล</div>
+                                          <q-item v-for="(med, idx) in prescriptions" :key="idx" class="hover-effect">
+                                              <q-item-section avatar>
+                                                  <q-avatar icon="pill" color="orange-9" text-color="white" size="sm"/>
+                                              </q-item-section>
+                                              <q-item-section>
+                                                  <q-item-label class="text-white text-weight-bold">{{ med.name }}</q-item-label>
+                                                  <q-item-label caption class="text-grey-4">{{ med.dosage }} • {{ med.quantity }}</q-item-label>
+                                                  <q-item-label caption class="text-cyan-2" style="font-size: 11px;">{{ med.instruction }}</q-item-label>
+                                              </q-item-section>
+                                              <q-item-section side>
+                                                  <q-btn flat round dense icon="delete_outline" color="red-4" @click="removeMedication(idx)">
+                                                      <q-tooltip>ลบรายการนี้</q-tooltip>
+                                                  </q-btn>
+                                              </q-item-section>
+                                          </q-item>
+                                      </q-list>
+                                  </q-card>
+                              </div>
+
+                              <div class="col-12 col-md-6">
+                                  <q-card class="bg-dark-glass border-light shadow-2 full-height">
+                                      <q-card-section class="bg-dark-translucent border-bottom-light row items-center justify-between">
+                                          <div class="text-subtitle1 text-purple-3"><q-icon name="medical_services" class="q-mr-sm"/>บริการและหัตถการ</div>
+                                          <q-badge color="purple-9" text-color="purple-1" rounded>{{ servicesReceived.selected.length + proceduresPerformed.selected.length }} รายการ</q-badge>
+                                      </q-card-section>
+
+                                      <q-list separator dark class="q-py-sm">
+                                          <div v-if="servicesReceived.selected.length === 0 && proceduresPerformed.selected.length === 0" class="text-grey-6 text-center q-pa-md">ไม่มีข้อมูล</div>
+
+                                          <q-item v-for="(item, idx) in servicesReceived.selected" :key="'s'+idx" class="hover-effect">
+                                              <q-item-section avatar>
+                                                  <q-icon name="local_hospital" color="purple-3" size="xs"/>
+                                              </q-item-section>
+                                              <q-item-section class="text-white">{{ item }} <span class="text-caption text-grey-5">(บริการ)</span></q-item-section>
+                                              <q-item-section side>
+                                                  <q-btn flat round dense icon="delete_outline" color="red-4" @click="removeServiceItem(idx)">
+                                                      <q-tooltip>ลบรายการนี้</q-tooltip>
+                                                  </q-btn>
+                                              </q-item-section>
+                                          </q-item>
+
+                                          <q-item v-for="(item, idx) in proceduresPerformed.selected" :key="'p'+idx" class="hover-effect">
+                                              <q-item-section avatar>
+                                                  <q-icon name="healing" color="deep-purple-3" size="xs"/>
+                                              </q-item-section>
+                                              <q-item-section class="text-white">{{ item }} <span class="text-caption text-grey-5">(หัตถการ)</span></q-item-section>
+                                              <q-item-section side>
+                                                  <q-btn flat round dense icon="delete_outline" color="red-4" @click="removeProcedureItem(idx)">
+                                                      <q-tooltip>ลบรายการนี้</q-tooltip>
+                                                  </q-btn>
+                                              </q-item-section>
+                                          </q-item>
+                                      </q-list>
+                                  </q-card>
+                              </div>
+
+                          </div>
+
                         </q-scroll-area>
                     </q-tab-panel>
 
@@ -576,7 +777,7 @@ const patientInfo = ref({
 });
 
 const historyData = ref({ chiefComplaint: '', presentIllness: '' });
-const assessmentPlan = ref({ diagnosis: [], diagnosisOtherText: '', plan: '' });
+const assessmentPlan = ref({ diagnosis: [], diagnosisOtherText: '', plan: [] });
 const referralNotes = ref('');
 const servicesReceived = ref({ selected: [], otherText: '' });
 const proceduresPerformed = ref({ selected: [], otherText: '' });
@@ -685,12 +886,52 @@ const getStatusChipClass = (status) => {
 // =================================================================================
 const allDoctors = ref([]);
 const diagnosisOptions = ref([]); const filteredDiagnosisOptions = ref([]);
-const planOptions = ref(['Follow up', 'Referral', 'Discharge', 'Admit', 'Observation']); const filteredPlanOptions = ref([...planOptions.value]);
 const serviceOptions = ref([]); const filteredServiceOptions = ref([]);
 const procedureOptions = ref([]); const filteredProcedureOptions = ref([]);
 const medicationOptions = ref([]); const filteredMedicationOptions = ref([]);
 const medicationMap = ref({});
 const diagnosisMap = ref({});
+// =================================================================================
+// 📍 ส่วนจัดการ "แผนการรักษา (Treatment Plan)" แบบอัจฉริยะ
+// =================================================================================
+
+// 1. Master Data: รายการแผนการรักษาทั้งหมดที่มีในระบบ
+const planOptions = ref([
+  'Home (รับยากลับบ้าน)',
+  'Admit (นอนโรงพยาบาล)',
+  'Appointment (นัดติดตามอาการ)',
+  'Referral (ส่งตัวต่อ)',
+  'Observe (สังเกตอาการที่ห้องฉุกเฉิน/OPD)',
+  'Discharge (จำหน่าย/สิ้นสุดการรักษา)',
+  'Consult (ปรึกษาแผนกอื่น)',
+  'Emergency Operation (เซตผ่าตัดด่วน)',
+  'Dead (เสียชีวิต)',
+  'Refuse Treatment (ปฏิเสธการรักษา)'
+]);
+
+// ตัวแปรเก็บผลลัพธ์การกรอง (ใช้ผูกกับ UI)
+const filteredPlanOptions = ref([...planOptions.value]);
+
+// 2. Mapping: "แผนกนี้...ชอบใช้อะไร?" (Config ได้ตามใจชอบ)
+const deptPlanMapping = {
+  // แผนกฉุกเฉิน: เน้นหนักไปทาง Admit, Refer, Observe
+  'ER': ['Admit (นอนโรงพยาบาล)', 'Referral (ส่งตัวต่อ)', 'Observe (สังเกตอาการที่ห้องฉุกเฉิน/OPD)', 'Emergency Operation (เซตผ่าตัดด่วน)'],
+
+  // ผู้ป่วยนอก: เน้นรับยากลับบ้าน หรือนัดมาดูใหม่
+  'OPD': ['Home (รับยากลับบ้าน)', 'Appointment (นัดติดตามอาการ)', 'Admit (นอนโรงพยาบาล)', 'Consult (ปรึกษาแผนกอื่น)'],
+
+  // ผู้ป่วยใน: เน้นจำหน่าย หรือส่งตัว
+  'IPD': ['Discharge (จำหน่าย/สิ้นสุดการรักษา)', 'Referral (ส่งตัวต่อ)', 'Dead (เสียชีวิต)'],
+
+  // ห้องผ่าตัด: ส่วนใหญ่ผ่าเสร็จต้อง Admit หรือดูอาการ
+  'OR': ['Admit (นอนโรงพยาบาล)', 'Observe (สังเกตอาการที่ห้องฉุกเฉิน/OPD)'],
+
+  // ทันตกรรม: ส่วนใหญ่กลับบ้าน
+  'DENT': ['Home (รับยากลับบ้าน)', 'Appointment (นัดติดตามอาการ)'],
+
+  // กายภาพ: ส่วนใหญ่นัดทำต่อ
+  'PT': ['Appointment (นัดติดตามอาการ)', 'Home (รับยากลับบ้าน)']
+};
 
 // 🚩 [คืนค่าที่หายไป] Dropdown Options สำหรับสั่งยา
 const dosageOptions = ref(['1 เม็ด', '2 เม็ด', '1 ซอง', '10 ml', '15 ml']);
@@ -716,7 +957,37 @@ const filterOptions = (val, update, optionsRef, masterOptions) => {
 };
 
 const filterDiagnosis = (val, update) => filterOptions(val, update, filteredDiagnosisOptions, diagnosisOptions.value);
-const filterPlan = (val, update) => filterOptions(val, update, filteredPlanOptions, planOptions.value);
+const filterPlan = (val, update) => {
+  update(() => {
+    // A. ดึงแผนกที่ส่งตัวมา (ถ้าไม่มีให้เป็นค่าว่าง)
+    const currentDept = visitData.value?.visit?.referral_department || '';
+
+    // B. หา "ตัวเลือกแนะนำ" (Priorities)
+    // เทคนิค: เช็คว่าชื่อแผนกใน DB (currentDept) มีคำคีย์เวิร์ดของ Mapping เราไหม?
+    // เช่น "ER อุบัติเหตุ" ก็จะเจอคีย์ "ER"
+    const foundKey = Object.keys(deptPlanMapping).find(k =>
+      currentDept.toUpperCase().includes(k)
+    );
+    const priorities = foundKey ? deptPlanMapping[foundKey] : [];
+
+    // C. สร้างรายการที่จัดเรียงแล้ว (Sorted Options)
+    // เอาตัวแนะนำขึ้นก่อน -> ตามด้วยตัวที่เหลือ (โดยไม่ให้ซ้ำกัน)
+    const sortedOptions = [
+        ...priorities,
+        ...planOptions.value.filter(opt => !priorities.includes(opt))
+    ];
+
+    // D. กรองตามคำค้นหา (Search Logic)
+    if (val === '') {
+      // ถ้าไม่ได้พิมพ์อะไร ให้โชว์รายการที่จัดเรียงแล้วเลย
+      filteredPlanOptions.value = sortedOptions;
+    } else {
+      // ถ้าพิมพ์ค้นหา ก็กรองจากรายการที่จัดเรียงแล้วเช่นกัน
+      const needle = val.toLowerCase();
+      filteredPlanOptions.value = sortedOptions.filter(v => v.toLowerCase().includes(needle));
+    }
+  });
+};
 const filterServices = (val, update) => filterOptions(val, update, filteredServiceOptions, serviceOptions.value);
 const filterProcedures = (val, update) => filterOptions(val, update, filteredProcedureOptions, procedureOptions.value);
 const filterMedication = (val, update) => filterOptions(val, update, filteredMedicationOptions, medicationOptions.value);
@@ -730,15 +1001,20 @@ const filterInstruction = (val, update) => filterOptions(val, update, filteredIn
 // 5. COMPUTED PROPERTIES
 // =================================================================================
 
+// 📍 แก้ไข Computed Property ในหน้า DoctorDiagnosisPage.vue
 const filteredPatientQueue = computed(() => {
-  if (currentDoctor.value === 'ทั้งหมด') return patientQueue.value;
+  // 🔥 ปลดล็อค: ถ้าเป็น Admin ให้ข้ามการกรอง และโชว์รายชื่อทั้งหมดที่โหลดมาได้ทันที
+  if (authStore.userRole === 'Admin' || authStore.role === 'Admin' || currentDoctor.value === 'ทั้งหมด') {
+      return patientQueue.value;
+  }
+
+  // สำหรับหมอทั่วไป: กรองเฉพาะคนไข้ที่ระบุ ID หมอตรงกับตัวเอง
   const myId = String(authStore.userId);
   return patientQueue.value.filter(patient => {
     if (!patient.visits || patient.visits.length === 0) return false;
     return patient.visits.some(v => String(v.referral_doctor || '') === myId);
   });
 });
-
 const doctorSelectOptions = computed(() => {
   const options = ['ทั้งหมด'];
   if (allDoctors.value.length > 0) {
@@ -770,24 +1046,44 @@ const summaryAllColumns = [ { name: 'category', label: 'หมวดหมู่
 // 6. SAVE SYSTEM
 // =================================================================================
 
+// ใน DoctorDiagnosisPage.vue
+const isSavingTransaction = ref(false);
+// 🔥 function performSave ฉบับแก้ไข: ส่งข้อมูลว่างไปลบ DB ได้
 const performSave = async (statusToSave = null, isSilent = false) => {
   const visitId = route.query.visitId;
   if (!visitId) return;
 
+  // 1. กันการกดรัว/ทำงานซ้ำ
+  if (isSavingTransaction.value) return;
+  isSavingTransaction.value = true;
+
   try {
+    // เตรียม Token และ Header
+    const token = authStore.token || localStorage.getItem('token');
+    const config = {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    };
+
     const apiCalls = [];
 
-    // 1. เตรียมข้อมูล Visit หลัก และ Vitals (แนบ ID หมอเพื่อบันทึกคนบันทึกล่าสุด)
+    // --- 1. Visit Data (ข้อมูลทั่วไป + สัญญาณชีพ) ---
+    // --- 1. Visit Data ---
     const visitPayload = {
       chief_complaint: historyData.value.chiefComplaint,
       present_illness: historyData.value.presentIllness,
-      referral_department: assessmentPlan.value.plan,
+
+      // 🔥 แก้ตรงนี้: ถ้า plan เป็น Array (หลายข้อ) ให้รวมเป็นข้อความเดียวคั่นด้วย ", "
+      // ถ้าไม่ใช่ Array (กรณีข้อมูลเก่าหรือค่าว่าง) ก็ส่งไปตามปกติ
+      plan: Array.isArray(assessmentPlan.value.plan)
+        ? assessmentPlan.value.plan.join(', ')
+        : assessmentPlan.value.plan,
+
       referral_notes: referralNotes.value,
-      referral_doctor: String(authStore.userId), // หมอที่รับช่วงต่อ
-
-      // 🔥 [เพิ่มใหม่] ID หมอผู้ที่กำลังกดบันทึก (สำหรับช่อง recorder_id ใน Visits)
+      referral_doctor: String(authStore.userId),
       UserID: authStore.userId,
-
+      recorder_id: authStore.userId,
       temperature: newVitalSign.temperature,
       pulse: newVitalSign.pulse,
       respiration: newVitalSign.breathing,
@@ -799,73 +1095,70 @@ const performSave = async (statusToSave = null, isSilent = false) => {
       waist_circumference: newVitalSign.waist,
       bmi: newVitalSign.bmi
     };
-
     if (statusToSave) visitPayload.status = statusToSave;
 
-    // คำสั่งที่ 1: อัปเดตข้อมูล Visit & Vital Signs
-    apiCalls.push(axios.put(`http://localhost:3000/api/visits/${visitId}`, visitPayload));
+    // ยิง API 1: Update Visit หลัก
+    apiCalls.push(axios.put(`http://localhost:3000/api/visits/${visitId}`, visitPayload, config));
 
-    // 2. เตรียมข้อมูลการวินิจฉัย และหัตถการ (แนบ ID หมอเพื่อบันทึก doctor_id และ recorded_by)
-    const diagnosesPayload = assessmentPlan.value.diagnosis.map(dName => {
-      const code = diagnosisMap.value[dName] || dName;
-      return { name: dName, diagnosis_name: dName, diagnosis_code: code, code: code, icd10_code: code };
-    });
+    // --- 2. Diagnosis (การวินิจฉัย) ---
+    const validDiagnoses = assessmentPlan.value.diagnosis
+      .map(dName => {
+        const code = diagnosisMap.value[dName];
+        if (!code) return null;
+        return { icd10_code: code, diagnosis_type: 'PRINCIPAL' };
+      })
+      .filter(d => d !== null);
 
-    // 🔥 [แก้ไขโครงสร้าง] ห่อข้อมูลเป็น Object เพื่อส่ง doctor_id ไปด้วย
+    // 🔥 แก้ไขจุดที่ 1: ส่ง request ไปเลย (ไม่ต้องมี if check length > 0)
+    // ถ้าส่ง [] ไป Backend จะรู้ว่าต้องลบข้อมูลเก่าทิ้งทั้งหมด
+    apiCalls.push(axios.post(`http://localhost:3000/api/visit-diagnoses`, {
+        visit_id: visitId,
+        diagnoses: validDiagnoses,
+        doctor_id: authStore.userId
+    }, config));
+
+    // --- 3. Procedures (บริการและหัตถการ) ---
     const proceduresWrappedPayload = {
-      diagnoses: diagnosesPayload,
       procedures: proceduresPerformed.value.selected.map(pName => ({ name: pName })),
       services: servicesReceived.value.selected.map(sName => ({ name: sName })),
-      // 🔥 แนบ ID หมอเพื่อบันทึกคนวินิจฉัยและคนสั่งหัตถการ
       doctor_id: authStore.userId
     };
+    // อันนี้เดิมก็ไม่มี if อยู่แล้ว (ถูกต้องแล้ว)
+    apiCalls.push(axios.put(`http://localhost:3000/api/visits/${visitId}/procedures`, proceduresWrappedPayload, config));
 
-    // คำสั่งที่ 2: บันทึกการวินิจฉัย/หัตถการ
-    apiCalls.push(axios.put(`http://localhost:3000/api/visits/${visitId}/procedures`, proceduresWrappedPayload));
-
-    // 3. เตรียมข้อมูลการสั่งยา (แนบ ID หมอเพื่อบันทึก prescribed_by)
-    if (prescriptions.value.length >= 0) {
-      const medsList = prescriptions.value.map(med => ({
+    // --- 4. Prescriptions (สั่งยา) ---
+    const medsList = prescriptions.value.map(med => ({
         drug_name: med.name,
         drug_id: medicationMap.value[med.name] || null,
         dosage: med.dosage,
         quantity: med.quantity,
         instruction: med.instruction,
-        // 🔥 แนบ ID หมอลงในแต่ละรายการยาเพื่อความชัวร์
         prescribed_by: authStore.userId
-      }));
+    }));
 
-      // 🔥 [แก้ไขโครงสร้าง] ห่อรายการยาพร้อม ID หมอผู้สั่ง
-      const prescriptionsWrappedPayload = {
+    // 🔥 แก้ไขจุดที่ 2: ส่ง request ไปเลย (ไม่ต้องมี if check length > 0)
+    // ถ้าส่ง [] ไป Backend จะรู้ว่าต้องลบรายการยาเก่าทิ้งทั้งหมด
+    apiCalls.push(axios.post(`http://localhost:3000/api/prescriptions/visit/${visitId}`, {
         items: medsList,
         doctor_id: authStore.userId
-      };
+    }, config));
 
-      // คำสั่งที่ 3: บันทึกใบสั่งยา
-      apiCalls.push(axios.post(`http://localhost:3000/api/prescriptions/visit/${visitId}`, prescriptionsWrappedPayload));
-    }
-
-    // ทำการยิง API ทั้งหมดพร้อมกันแบบ Transaction-like
+    // --- 5. รอให้ทุก API ทำงานเสร็จสิ้น ---
     await Promise.all(apiCalls);
 
     if (!isSilent) {
-      $q.notify({
-        type: 'positive',
-        message: 'บันทึกการรักษาเรียบร้อย โดย: ' + authStore.userName,
-        icon: 'o_save',
-        position: 'top'
-      });
+      $q.notify({ type: 'positive', message: 'บันทึกเรียบร้อย', icon: 'o_save', position: 'top' });
     }
 
   } catch (error) {
-    console.error("❌ Doctor Save Error:", error);
-    $q.notify({
-      type: 'negative',
-      message: 'บันทึกไม่สำเร็จ',
-      caption: error.response?.data?.message || 'กรุณาตรวจสอบการเชื่อมต่อ',
-      icon: 'error',
-      position: 'top'
-    });
+    console.error("❌ Save Error:", error);
+    if (error.response && error.response.status === 401) {
+       $q.notify({ type: 'negative', message: 'หมดเวลาใช้งาน กรุณา Login ใหม่', icon: 'lock', position: 'top' });
+    } else {
+       $q.notify({ type: 'negative', message: 'บันทึกไม่สำเร็จ', icon: 'error', position: 'top' });
+    }
+  } finally {
+    isSavingTransaction.value = false;
   }
 };
 
@@ -883,18 +1176,113 @@ const handleAutoSave = async () => {
 // =================================================================================
 // 7. ACTIONS & NAVIGATION
 // =================================================================================
-const addMedication = () => { if (!isMedicationFormValid.value) return; playSelectionSound(); prescriptions.value.push({ ...newMedication.value }); newMedication.value = { name: '', dosage: '', quantity: '', instruction: '' }; handleAutoSave(); }
-const removeMedication = (index) => { playRemoveSound(); prescriptions.value.splice(index, 1); handleAutoSave(); }
-const removeDiagnosisItem = (i) => { playRemoveSound(); assessmentPlan.value.diagnosis.splice(i, 1); handleAutoSave(); };
-const removeServiceItem = (i) => { playRemoveSound(); servicesReceived.value.selected.splice(i, 1); handleAutoSave(); };
-const removeProcedureItem = (i) => { playRemoveSound(); proceduresPerformed.value.selected.splice(i, 1); handleAutoSave(); };
 
+// 🔥 STATE ใหม่: เก็บค่าว่า "ไม่ต้องถามยืนยันอีก" หรือไม่ (Default = false คือต้องถาม)
+const skipDeleteConfirmation = ref(false);
+
+// 🔥 HELPER: ฟังก์ชันพระเอกสำหรับเด้งถาม (Game Style Popup)
+const confirmDelete = (onConfirm) => {
+  // 1. ถ้าติ๊กไว้แล้วว่า "ไม่ต้องถาม" (Skip) -> ให้ทำคำสั่งลบเลยทันที
+  if (skipDeleteConfirmation.value) {
+    onConfirm();
+    return;
+  }
+
+  // 2. ถ้ายังไม่ติ๊ก -> เด้ง Popup ถามก่อน
+  $q.dialog({
+    title: 'ยืนยันการลบ',
+    message: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
+    dark: true, // ธีมมืด
+    class: 'glass-dialog', // ใช้ธีมแก้วเหมือนเพื่อน
+    ok: { label: 'ลบ', color: 'red-4', flat: true },
+    cancel: { label: 'ยกเลิก', color: 'white', flat: true },
+    persistent: true,
+    // ✨ พระเอกของเรา: Checkbox "ไม่ต้องถามอีก"
+    options: {
+      type: 'checkbox',
+      model: [], // ค่าเริ่มต้น (ยังไม่เลือก)
+      items: [
+        { label: 'ไม่ต้องถามอีกในครั้งนี้ (Don\'t ask again)', value: 'skip', color: 'cyan-3' }
+      ],
+      isValid: val => true // ยอมรับได้เสมอ (ไม่บังคับเลือก)
+    }
+  }).onOk(data => {
+    // เช็คว่า user ติ๊กช่อง "ไม่ต้องถามอีก" หรือไม่?
+    if (Array.isArray(data) && data.includes('skip')) {
+      skipDeleteConfirmation.value = true;
+      $q.notify({ type: 'info', message: 'เปิดโหมดลบเร็ว: ระบบจะไม่ถามยืนยันอีกในรอบนี้', icon: 'speed' });
+    }
+
+    // ทำการลบจริง
+    onConfirm();
+  });
+};
+
+// --- Medication Actions ---
+const addMedication = () => {
+  if (!isMedicationFormValid.value) return;
+  playSelectionSound();
+  prescriptions.value.push({ ...newMedication.value });
+  newMedication.value = { name: '', dosage: '', quantity: '', instruction: '' };
+  handleAutoSave();
+};
+
+// 🔥 อัปเดต: ใช้ confirmDelete
+const removeMedication = (index) => {
+  confirmDelete(() => {
+    playRemoveSound();
+    prescriptions.value.splice(index, 1);
+    handleAutoSave();
+  });
+};
+
+// --- Diagnosis & Plan Actions ---
+// 🔥 อัปเดต: ใช้ confirmDelete
+const removeDiagnosisItem = (i) => {
+  confirmDelete(() => {
+    playRemoveSound();
+    assessmentPlan.value.diagnosis.splice(i, 1);
+    handleAutoSave();
+  });
+};
+
+// 🔥 อัปเดต: ใช้ confirmDelete
+const removePlanItem = (index) => {
+  confirmDelete(() => {
+    playRemoveSound();
+    assessmentPlan.value.plan.splice(index, 1);
+    handleAutoSave();
+  });
+};
+
+// --- Services & Procedures Actions ---
+// 🔥 อัปเดต: ใช้ confirmDelete
+const removeServiceItem = (i) => {
+  confirmDelete(() => {
+    playRemoveSound();
+    servicesReceived.value.selected.splice(i, 1);
+    handleAutoSave();
+  });
+};
+
+// 🔥 อัปเดต: ใช้ confirmDelete
+const removeProcedureItem = (i) => {
+  confirmDelete(() => {
+    playRemoveSound();
+    proceduresPerformed.value.selected.splice(i, 1);
+    handleAutoSave();
+  });
+};
+
+// --- Workflow Actions ---
 const confirmTreatmentComplete = () => {
   $q.dialog({
     title: 'ยืนยันปิดเคส',
     message: 'คุณต้องการบันทึกการรักษาและปิดเคสนี้ใช่หรือไม่?',
     cancel: true,
-    persistent: true
+    persistent: true,
+    dark: true,
+    class: 'glass-dialog'
   }).onOk(async () => {
     await performSave('รักษาเสร็จสิ้น');
     $q.notify({ type: 'positive', message: 'ปิดเคสเรียบร้อย' });
@@ -907,6 +1295,7 @@ const handleSaveAndForward = async () => {
   $q.notify({ type: 'primary', message: `ส่งข้อมูลไปห้องยาเรียบร้อย`, icon: 'o_send', position: 'top' });
 };
 
+// --- Navigation & UI Helpers ---
 const switchPatient = (patientId) => {
   if (activePatientId.value === patientId) return;
   playClickSound();
@@ -937,6 +1326,94 @@ const openCertificateDialog = () => {
   showCertificateDialog.value = true;
 };
 
+// --- Date & Time Formatters ---
+// แก้ไขฟังก์ชัน formatDateTh ให้มี monthsShort
+// 🔥 แก้ไข: คำนวณปี พ.ศ. เอง (ค.ศ. + 543)
+const formatDateTh = (dateStr) => {
+  if (!dateStr) return '';
+
+  const d = new Date(dateStr); // แปลงเป็น Date Object
+
+  // 1. แปลงวันและเดือน (ภาษาไทย)
+  const dayMonth = date.formatDate(d, 'D MMM', {
+    monthsShort: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+  });
+
+  // 2. คำนวณปี พ.ศ. (เอาปี ค.ศ. + 543)
+  const buddhistYear = d.getFullYear() + 543;
+
+  return `${dayMonth} ${buddhistYear}`;
+};
+
+// 🔥 อันนี้เหมือนเดิม แต่เช็คความชัวร์
+const formatVisitLabel = (visit) => {
+  if (!visit) return 'Loading...';
+  // เรียกใช้ฟังก์ชันด้านบน + เวลา (HH:mm)
+  return `${formatDateTh(visit.visit_datetime)} (${date.formatDate(visit.visit_datetime, 'HH:mm')})`;
+};
+
+const getStatusColor = (status) => {
+  if (status === 'รอพบแพทย์') return 'orange';
+  if (status === 'กำลังรักษา') return 'blue';
+  return 'green';
+};
+
+// 🔥 Function: เปลี่ยน Visit ในหน้าเดิม
+const switchVisitInPage = async (newVisitId) => {
+  if (newVisitId == route.query.visitId) return; // ถ้าอันเดิมไม่ต้องทำอะไร
+
+  playClickSound();
+
+  // 1. อัปเดต URL (โดยไม่ reload หน้า)
+  await router.replace({
+    query: {
+      ...route.query,
+      visitId: newVisitId
+    }
+  });
+
+  // 2. โหลดข้อมูลใหม่
+  await loadVisitDetail(newVisitId);
+
+  $q.notify({ type: 'info', message: 'เปลี่ยนข้อมูลการตรวจเรียบร้อยแล้ว', position: 'top', timeout: 1000 });
+};
+
+// 🔥 Function: ล้างข้อมูล (Clear Data)
+const confirmClearData = () => {
+  $q.dialog({
+    title: 'ล้างข้อมูลทั้งหมด?',
+    message: 'ข้อมูลที่คุณกรอก (อาการ, วินิจฉัย, สั่งยา) จะถูกลบออกทั้งหมด คุณแน่ใจหรือไม่?',
+    cancel: true,
+    persistent: true,
+    ok: { label: 'ล้างข้อมูล', color: 'red', flat: true },
+    cancel: { label: 'ยกเลิก', color: 'white', flat: true },
+    class: 'glass-dialog'
+  }).onOk(() => {
+    clearAllInputData();
+    playRemoveSound();
+    $q.notify({ type: 'positive', message: 'ล้างข้อมูลเรียบร้อย', icon: 'delete_sweep' });
+  });
+};
+
+const clearAllInputData = () => {
+  // 1. ล้าง History
+  historyData.value = { chiefComplaint: '', presentIllness: '' };
+
+  // 2. ล้าง Diagnosis & Plan
+  // 🔥 แก้ไขตรงนี้: plan ต้องเป็น [] (Array) เพื่อให้เข้ากับ Multi-select
+  assessmentPlan.value = { diagnosis: [], diagnosisOtherText: '', plan: [] };
+  referralNotes.value = '';
+
+  // 3. ล้าง Services & Procedures
+  servicesReceived.value = { selected: [], otherText: '' };
+  proceduresPerformed.value = { selected: [], otherText: '' };
+
+  // 4. ล้างใบสั่งยา
+  prescriptions.value = [];
+
+  // 5. สั่ง Auto Save เพื่อเคลียร์ใน DB ด้วย
+  handleAutoSave();
+};
 // =================================================================================
 // 8. DATA LOADERS
 // =================================================================================
@@ -944,58 +1421,111 @@ const loadVisitDetail = async (id) => {
   if (!id) return;
   isInternalLoading.value = true;
   try {
+    // 1. ดึงข้อมูลรายละเอียดการตรวจ (Visit Details)
     const response = await axios.get(`http://localhost:3000/api/visits/details/${id}`);
     const data = response.data;
     visitData.value = data;
 
+    // 🚩 [จุดสำคัญ] เมื่อโหลดข้อมูล Visit สำเร็จ ให้เอาวันที่ของเคสนั้นไปโหลดคิวคนไข้ในแถบด้านบน
+    if (data.visit && data.visit.visit_datetime) {
+      // ตัดเอาเฉพาะวันที่ YYYY-MM-DD เพื่อส่งไปให้ loadPatientQueue
+      const visitDate = data.visit.visit_datetime.split('T')[0];
+      console.log(`📅 Loading switcher queue for date: ${visitDate}`);
+
+      // เรียกใช้ฟังก์ชันเดิมเพื่อโหลดรายชื่อคนไข้ทั้งหมดในวันนั้นมาโชว์ที่แถบ Switcher
+      loadPatientQueue(visitDate);
+    }
+
+    // --- จัดการข้อมูลแผนการรักษาและบันทึก ---
     if (data.visit) {
-      assessmentPlan.value.plan = data.visit.referral_department || '';
+      assessmentPlan.value.plan = data.visit.plan
+        ? data.visit.plan.split(', ')
+        : [];
       referralNotes.value = data.visit.referral_notes || '';
     }
 
+    // --- จัดการข้อมูลวินิจฉัย (Diagnosis) ---
     assessmentPlan.value.diagnosis = (data.diagnoses || []).map(d => {
       const name = d.name || d.diagnosis_name;
+      // เก็บ Mapping ระหว่างชื่อและ Code ไว้สำหรับใช้ตอนกด Save
       diagnosisMap.value[name] = d.diagnosis_code || d.code || d.icd10_code;
       return name;
     });
 
+    // --- จัดการข้อมูลบริการและหัตถการ ---
     servicesReceived.value.selected = (data.services || []).map(s => s.name);
     proceduresPerformed.value.selected = (data.procedures || []).map(p => p.name);
 
-    if (data.patientInfo) patientInfo.value = { ...data.patientInfo };
+    // --- จัดการข้อมูลพื้นฐานผู้ป่วย ---
+    if (data.patientInfo) {
+        patientInfo.value = { ...data.patientInfo };
+    }
 
+    // --- จัดการข้อมูลสัญญาณชีพ (Vital Signs) ---
     if (data.vitalSigns) {
       Object.assign(newVitalSign, {
-        temperature: data.vitalSigns.temperature, pulse: data.vitalSigns.pulse,
-        breathing: data.vitalSigns.respiration, bloodPressureSystolic: data.vitalSigns.blood_pressure_systolic,
-        bloodPressureDiastolic: data.vitalSigns.blood_pressure_diastolic, oxygenSaturation: data.vitalSigns.oxygen_saturation,
-        height: data.vitalSigns.height, weight: data.vitalSigns.weight, waist: data.vitalSigns.waist_circumference
+        temperature: data.vitalSigns.temperature,
+        pulse: data.vitalSigns.pulse,
+        breathing: data.vitalSigns.respiration,
+        bloodPressureSystolic: data.vitalSigns.blood_pressure_systolic,
+        bloodPressureDiastolic: data.vitalSigns.blood_pressure_diastolic,
+        oxygenSaturation: data.vitalSigns.oxygen_saturation,
+        height: data.vitalSigns.height,
+        weight: data.vitalSigns.weight,
+        waist: data.vitalSigns.waist_circumference
       });
       calculateBMI();
     }
 
+    // --- จัดการประวัติอาการ (Symptoms/History) ---
     if (data.symptoms) {
       historyData.value.chiefComplaint = (data.symptoms.chiefComplaints || []).map(c => c.name).join(', ') || data.visit?.chief_complaint || '';
       historyData.value.presentIllness = data.symptoms.PresentIllness || data.visit?.present_illness || '';
     }
 
+    // --- จัดการข้อมูลใบสั่งยา (Prescriptions) ---
     const resMeds = await axios.get(`http://localhost:3000/api/prescriptions/visit/${id}`);
     const meds = Array.isArray(resMeds.data) ? resMeds.data : (resMeds.data.items || []);
     prescriptions.value = meds.map(p => ({
-      name: p.drug_name || p.name, dosage: p.dosage, quantity: p.quantity, instruction: p.instruction
+      name: p.drug_name || p.name,
+      dosage: p.dosage,
+      quantity: p.quantity,
+      instruction: p.instruction
     }));
 
-  } catch (error) { console.error("❌ Load Detail Error:", error); }
-  finally { setTimeout(() => { isInternalLoading.value = false; }, 800); }
+  } catch (error) {
+    console.error("❌ Load Detail Error:", error);
+    $q.notify({ type: 'negative', message: 'ไม่สามารถโหลดรายละเอียดการตรวจได้' });
+  } finally {
+    // หน่วงเวลาเล็กน้อยเพื่อให้ UI ดูสมูทขึ้น
+    setTimeout(() => { isInternalLoading.value = false; }, 800);
+  }
 };
-
 const loadPatientQueue = async (queryDate) => {
   try {
+    const params = { date: queryDate };
+
+    // 1. 🔥 ดึง Role จาก userRole (ตามที่ปรากฏใน Log บรรทัดที่ 876)
+    // เช็คทั้ง userRole และ role เพื่อความปลอดภัย
+    const currentRole = authStore.userRole || authStore.role || authStore.user?.role;
+
+    // 2. 🔥 ตรวจสอบสิทธิ์: ถ้าไม่ใช่ Admin ให้ส่ง doctor_id ไปกรองตามปกติ
+    if (currentRole?.toLowerCase() !== 'admin') {
+        params.doctor_id = authStore.userId;
+    } else {
+        console.log("🔓 [DiagnosisPage] Admin Mode: Fetching all patients for switcher (No ID filter)");
+    }
+
+    // ตรวจสอบค่า params ใน Console
+    console.log("🧐 Fetching Patient Queue with params:", params);
+
     const response = await axios.get('http://localhost:3000/api/doctors/patient-queue', {
-      params: { date: queryDate, doctor_id: authStore.userId }
+      params: params
     });
+
     const rawVisits = response.data;
 
+    // --- ส่วนดึงรายละเอียดเพิ่มเติมเพื่อหาเจ้าของเคส (referral_doctor) ---
     const enrichedVisits = await Promise.all(rawVisits.map(async (visit) => {
       try {
         if(visit.visit_id) {
@@ -1006,53 +1536,99 @@ const loadPatientQueue = async (queryDate) => {
       } catch (e) { return visit; }
     }));
 
+    // --- จัดกลุ่มข้อมูลตาม Patient ID เพื่อแสดงในแถบ Switcher ---
     const groups = {};
     enrichedVisits.forEach(p => {
-      const pid = p.patient_id_string || p.patient_id;
+      // ป้องกันเคสที่ข้อมูลไม่สมบูรณ์
+      const pid = p.patient_id_string || p.patient_id || 'unknown';
+
       if (!groups[pid]) {
         groups[pid] = {
           id: pid,
-          name: p.name || `${p.prefix || ''}${p.first_name} ${p.last_name}`.trim(),
+          name: p.name || `${p.prefix || ''}${p.first_name} ${p.last_name}`.trim() || 'ไม่ระบุชื่อ',
           avatarUrl: p.avatar_url,
           visits: []
         };
       }
       groups[pid].visits.push(p);
     });
+
     patientQueue.value = Object.values(groups);
-  } catch (error) { console.error('❌ Error fetching queue:', error) }
+    const totalPatients = patientQueue.value.length; // จำนวนคน (Unique Patients)
+    const totalVisits = enrichedVisits.length;      // จำนวนครั้งที่มา (Total Visits)
+
+    console.log(`✅ Loaded ${totalPatients} patients (${totalVisits} visits) into switcher.`);
+
+  } catch (error) {
+    console.error('❌ Error fetching queue:', error);
+    $q.notify({
+      type: 'negative',
+      message: 'โหลดข้อมูลคิวคนไข้ไม่สำเร็จ',
+      position: 'top'
+    });
+  }
 };
 
 const loadMasterData = async () => {
   try {
     const API_BASE = 'http://localhost:3000/api/masterdata';
+
+    // 🔥 แก้ไข 1: เปลี่ยนตัวแรกให้ดึงจาก /api/icd10 ตรงๆ เพื่อให้ได้ข้อมูล Code ชัวร์ๆ
     const [diagRes, serviceRes, procedureRes, medicationRes] = await Promise.all([
-      axios.get(`${API_BASE}/diagnosis`), axios.get(`${API_BASE}/services`),
-      axios.get(`${API_BASE}/procedures`), axios.get(`${API_BASE}/medications`)
+      axios.get('http://localhost:3000/api/icd10'),
+      axios.get(`${API_BASE}/services`),
+      axios.get(`${API_BASE}/procedures`),
+      axios.get(`${API_BASE}/medications`)
     ]);
 
+    // 🔥 แก้ไข 2: Logic การ Map ICD-10
     diagnosisOptions.value = diagRes.data.map(item => {
-      const name = item.diagnosis_name || item.name;
-      diagnosisMap.value[name] = item.diagnosis_code || item.code || item.icd10_code || name;
-      return name;
+      // จัด Format การแสดงผล เช่น "J00 : Acute nasopharyngitis"
+      // ต้องเช็ค field ให้ตรงกับที่ API ส่งมา (code, name_th, name_en)
+      const code = item.code;
+      const displayName = item.name_th
+        ? `${code} : ${item.name_th}`
+        : (item.name_en ? `${code} : ${item.name_en}` : code);
+
+      // 📌 จุดสำคัญ: จดจำว่า "ชื่อที่เลือกนี้" คู่กับ "Code อะไร"
+      // เพื่อตอนกด Save เราจะได้ดึง Code ไปบันทึกได้ถูก
+      diagnosisMap.value[displayName] = code;
+
+      return displayName; // return ค่าที่จะไปโชว์ใน Dropdown
     });
+
+    // อัปเดตตัวเลือกสำหรับการกรอง
+    filteredDiagnosisOptions.value = diagnosisOptions.value;
+
+    // --- ส่วน Service (เหมือนเดิม) ---
     serviceOptions.value = serviceRes.data.map(item => item.service_name || item.name);
+    filteredServiceOptions.value = serviceOptions.value;
+
+    // --- ส่วน Procedure (เหมือนเดิม) ---
     procedureOptions.value = procedureRes.data.map(item => item.procedure_name || item.name);
+    filteredProcedureOptions.value = procedureOptions.value;
+
+    // --- ส่วน Medication (เหมือนเดิม) ---
     medicationOptions.value = medicationRes.data.map(item => {
       const name = item.generic_name || item.name;
       medicationMap.value[name] = item.id;
       return name;
     });
-
-    filteredDiagnosisOptions.value = diagnosisOptions.value;
     filteredMedicationOptions.value = medicationOptions.value;
 
-    // 🚩 รีเซ็ต Filtered Options ให้เท่ากับค่าตั้งต้น
+    // --- รีเซ็ตตัวกรองยา (เหมือนเดิม) ---
     filteredDosageOptions.value = dosageOptions.value;
     filteredQuantityOptions.value = quantityOptions.value;
     filteredInstructionOptions.value = instructionOptions.value;
 
-  } catch (error) { console.error("❌ Master Data Load Error"); }
+  } catch (error) {
+    console.error("❌ Master Data Load Error", error);
+    $q.notify({
+      type: 'negative',
+      message: 'ไม่สามารถโหลดข้อมูล Master Data ได้',
+      caption: 'กรุณาตรวจสอบการเชื่อมต่อ Server'
+    });
+  }
 };
 
 const fetchDoctors = async () => {
@@ -1325,4 +1901,5 @@ $glass-border-light: 1px solid rgba(255, 255, 255, 0.15);
 .fit { width: 100%; height: 100%; }
 .col-grow { flex-grow: 1; }
 .nav-btn { opacity: 0.7; transition: 0.3s; &:hover { opacity: 1; background: rgba(255,255,255,0.1); } }
+
 </style>

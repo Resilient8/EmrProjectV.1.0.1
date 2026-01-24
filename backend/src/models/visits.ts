@@ -7,10 +7,10 @@ export interface VisitAttributes {
   patient_id: string;
   visit_datetime: Date;
   notes?: string;
-  UserID?: number;   // ID ผู้ใช้เดิมที่มีในระบบ
-  recorder_id?: number | null; // 🔥 [เพิ่มใหม่] ID พยาบาล/เจ้าหน้าที่ ผู้บันทึกเคส (จาก Migration)
+  UserID?: number;   // ID แพทย์เจ้าของไข้
+  recorder_id?: number | null; // ID พยาบาล/จนท. ผู้บันทึก
   
-  // ใน Interface ใช้ชื่อตัวเล็ก (เพื่อให้ Controller เรียกใช้ง่าย)
+  // อาการและ ROS
   present_illness?: string;
   ros_general?: string[];
   ros_head_and_neck?: string[];
@@ -19,9 +19,13 @@ export interface VisitAttributes {
   ros_gastrointestinal?: string[];
   ros_skin?: string[];
   
-  referral_department?: string;
+  // การส่งตัว & แผนการรักษา
+  referral_department?: string; // แผนกที่ส่งตัวมา (Nurse Input)
   referral_doctor?: string;
-  referral_notes?: string;
+  referral_notes?: string;      // Note เพิ่มเติม
+  
+  // 🔥 [เพิ่มใหม่] แผนการรักษาของแพทย์ (Doctor's Plan)
+  plan?: string; 
 
   status?: string; 
 }
@@ -32,7 +36,7 @@ class Visit extends Model<VisitAttributes> implements VisitAttributes {
   public visit_datetime!: Date;
   public notes?: string;
   public UserID?: number;   
-  public recorder_id?: number | null; // 🔥 [เพิ่มใหม่]
+  public recorder_id?: number | null;
   
   public present_illness?: string;
   public ros_general?: string[];
@@ -45,6 +49,10 @@ class Visit extends Model<VisitAttributes> implements VisitAttributes {
   public referral_department?: string;
   public referral_doctor?: string;
   public referral_notes?: string;
+  
+  // 🔥 [เพิ่มใหม่]
+  public plan?: string;
+
   public status?: string;
 
   public getVitalSign!: HasOneGetAssociationMixin<VitalSign>;
@@ -52,10 +60,10 @@ class Visit extends Model<VisitAttributes> implements VisitAttributes {
   static associate(models: any) {
     this.belongsTo(models.Patient, { foreignKey: 'patient_id', targetKey: 'patient_id', as: 'Patient' });
     
-    // เชื่อมโยง UserID เดิม
+    // เชื่อมโยง UserID (แพทย์)
     this.belongsTo(models.User, { foreignKey: 'UserID', as: 'userAccount' });
     
-    // 🔥 [เพิ่มใหม่] เชื่อม recorder_id กับตาราง User เพื่อดึงชื่อพยาบาลผู้บันทึก
+    // เชื่อมโยง recorder_id (พยาบาล/จนท.)
     this.belongsTo(models.User, { foreignKey: 'recorder_id', as: 'recordedBy' }); 
 
     this.hasOne(models.VitalSign, { foreignKey: 'visit_id', as: 'vitalSign' });
@@ -89,11 +97,10 @@ Visit.init({
     allowNull: true,
     field: 'UserID' 
   },
-  // 🔥🔥🔥 [เพิ่มใหม่] ฟิลด์บันทึกตัวตนพยาบาล/เจ้าหน้าที่ 🔥🔥🔥
   recorder_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    field: 'recorder_id' // ชื่อคอลัมน์ใน DB ที่เราเพิ่ง Migrate
+    field: 'recorder_id'
   },
   
   present_illness: {
@@ -144,6 +151,14 @@ Visit.init({
     type: DataTypes.TEXT,
     allowNull: true
   },
+  
+  // 🔥🔥🔥 [เพิ่มใหม่] แผนการรักษา (Admit/Discharge/etc.) 🔥🔥🔥
+  plan: {
+    type: DataTypes.TEXT, 
+    allowNull: true,
+    field: 'plan' // บังคับชื่อฟิลด์ใน DB ให้เป็น 'plan' ตัวเล็ก
+  },
+
   status: {
     type: DataTypes.STRING(100),
     allowNull: true, 

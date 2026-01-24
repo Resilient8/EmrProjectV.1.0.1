@@ -1,35 +1,32 @@
 import { Request, Response, NextFunction } from "express";
 import db from '../db';
-// 🔥 Fix 1: Add all necessary models including Symptom, Prescription, Product
+import { Op } from "sequelize";
+
+// 🔥 Fix 1: Import Models ให้ครบถ้วน
 const { 
   Patient, Visit, VisitSymptom, VisitProcedure, 
   Service, Procedure, Diagnosis, VitalSign, Symptom,
-  Prescription, Product 
+  Prescription, Product, VisitDiagnosis, ICD10 
 } = db;
-import { Op } from "sequelize";
 
-// 🔥 Helper Function: Convert prefix to gender (Male/Female)
+// 🔥 Helper Function: แปลงคำนำหน้าเป็นเพศ
 const getGenderFromPrefix = (prefix: string | null): string => {
     if (!prefix) return '-';
     const p = prefix.trim();
-    // Male prefixes
     if (['นาย', 'เด็กชาย', 'ด.ช.', 'Mr.', 'Master'].some(val => p.startsWith(val))) return 'ชาย';
-    // Female prefixes
     if (['นาง', 'นางสาว', 'น.s.', 'น.ส.', 'เด็กหญิง', 'ด.ญ.', 'Mrs.', 'Ms.', 'Miss'].some(val => p.startsWith(val))) return 'หญิง';
-    
-    return '-'; // Not specified or other titles
+    return '-'; 
 };
 
 // --- Get All Patients ---
 export const getAllPatients = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const patients = await Patient.findAll();
-    // Format data before sending
     const formattedPatients = patients.map((p: any) => {
         const json = p.toJSON();
         return {
             ...json,
-            gender: getGenderFromPrefix(json.prefix) // Add gender field
+            gender: getGenderFromPrefix(json.prefix)
         };
     });
 
@@ -54,7 +51,6 @@ export const getPatientById = async (req: Request, res: Response, next: NextFunc
       return res.status(404).json({ message: "Patient not found" });
     }
     
-    // Format data
     const json = patient.toJSON();
     const result = {
         ...json,
@@ -87,12 +83,11 @@ export const deletePatientById = async (req: Request, res: Response, next: NextF
   }
 };
 
-// --- Create New Patient (Supports Image Upload) ---
+// --- Create New Patient ---
 export const createPatient = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const newPatientData = req.body;
 
-    // 🔥 If file attached, save path to DB
     if (req.file) {
       newPatientData.avatar_url = `/uploads/${req.file.filename}`;
     }
@@ -108,7 +103,7 @@ export const createPatient = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-// --- Update Patient Info (General) ---
+// --- Update Patient Info ---
 export const updatePatient = async (req: Request, res: Response, next: NextFunction) => {
   const id = parseInt(req.params.id, 10);
   const updatedPatientData = req.body;
@@ -126,7 +121,7 @@ export const updatePatient = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-// --- 🔥 [NEW] Update Patient Profile Picture (Avatar) ---
+// --- Update Patient Avatar ---
 export const updatePatientAvatar = async (req: Request, res: Response, next: NextFunction) => {
   const id = parseInt(req.params.id, 10);
   
@@ -135,15 +130,12 @@ export const updatePatientAvatar = async (req: Request, res: Response, next: Nex
   }
 
   try {
-    // 1. Check if file exists
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // 2. Create Path
     const avatarUrl = `/uploads/${req.file.filename}`;
 
-    // 3. Update only avatar_url field
     const [affectedRows] = await Patient.update(
       { avatar_url: avatarUrl }, 
       { where: { id: id } }
@@ -153,7 +145,6 @@ export const updatePatientAvatar = async (req: Request, res: Response, next: Nex
        return res.status(404).json({ message: "Patient not found for avatar update" });
     }
 
-    // 4. Send URL back to Frontend
     res.status(200).json({
       message: "Avatar updated successfully",
       avatarUrl: avatarUrl 
@@ -190,7 +181,7 @@ export const getPatientRegistry = async (req: Request, res: Response, next: Next
       include: [{
         model: Visit,
         as: 'visits',
-        required: false, // Left Join
+        required: false, 
         attributes: [ 'visit_id', 'patient_id', 'visit_datetime', 'notes', 'UserID', 'status' ],
         include: [{
             model: VitalSign,
@@ -207,10 +198,7 @@ export const getPatientRegistry = async (req: Request, res: Response, next: Next
 
     const processedPatients = patientsWithVisits.map((patient: any) => {
       const patientJSON = patient.toJSON();
-      
-      // 🔥 [Fix] Calculate gender from prefix
       const gender = getGenderFromPrefix(patientJSON.prefix);
-
       let dailyCounter = 0;
       let lastDate = '';
 
@@ -218,7 +206,6 @@ export const getPatientRegistry = async (req: Request, res: Response, next: Next
 
       const visitsWithDailyNumber = rawVisits.map((visit: any) => {
         const visitDate = new Date(visit.visit_datetime).toISOString().slice(0, 10);
-        
         if (visitDate !== lastDate) {
           dailyCounter = 1;
           lastDate = visitDate;
@@ -230,11 +217,10 @@ export const getPatientRegistry = async (req: Request, res: Response, next: Next
       
       visitsWithDailyNumber.sort((a: any, b: any) => new Date(b.visit_datetime).getTime() - new Date(a.visit_datetime).getTime());
 
-      // Return processed data
       return { 
           ...patientJSON, 
-          gender: gender, // Send gender
-          bloodGroup: patientJSON.blood_group, // Send bloodGroup (camelCase)
+          gender: gender, 
+          bloodGroup: patientJSON.blood_group, 
           visits: visitsWithDailyNumber 
       };
     });
@@ -247,7 +233,7 @@ export const getPatientRegistry = async (req: Request, res: Response, next: Next
   }
 };
 
-// --- 🔥 Get Detailed Patient Record (Fixed Error Here) ---
+// --- 🔥 Get Detailed Patient Record (History) ---
 export const getPatientRecordById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const patientPrimaryKey = parseInt(req.params.id, 10);
@@ -262,24 +248,26 @@ export const getPatientRecordById = async (req: Request, res: Response, next: Ne
           as: 'visits',
           order: [['visit_datetime', 'DESC']],
           include: [
+            // 1. Vital Signs
             {
               model: VitalSign,
               as: 'vitalSign',
               attributes: { exclude: ['createdAt', 'updatedAt', 'id', 'visit_id'] }
             },
+            // 2. Symptoms
             {
               model: VisitSymptom,
               as: 'symptoms',
               attributes: { exclude: ['createdAt', 'updatedAt', 'id', 'visit_id'] },
-              // 🔥 Fix 2: Include Symptom (Name)
               include: [
                 {
                    model: Symptom,
-                   as: 'symptom', // Check alias in db index if used this name
+                   as: 'symptom', 
                    attributes: ['symptom_name']
                 }
               ]
             },
+            // 3. Procedures
             {
               model: VisitProcedure,
               as: 'visitProcedures',
@@ -290,17 +278,31 @@ export const getPatientRecordById = async (req: Request, res: Response, next: Ne
                 { model: Diagnosis, as: 'diagnosis', attributes: ['diagnosis_name'] }
               ]
             },
-            // 🔥 Fix 3: Include Prescription (Medication List)
+            // 4. Prescriptions
             {
                model: Prescription,
-               as: 'prescriptions', // Check alias in db index (usually prescriptions)
+               as: 'prescriptions',
                include: [
                   { 
-                     model: Product, // or Medicine depending on your Model
-                     as: 'product', // Check alias (usually product or medicine)
-                     // ⚠️ FIXED: Removed 'description' as it does not exist in DB
+                     model: Product, 
+                     as: 'product',
                      attributes: ['product_name'] 
                   }
+               ]
+            },
+            // 🔥🔥🔥 5. Visit Diagnoses (ICD-10) 🔥🔥🔥
+            {
+               model: VisitDiagnosis,
+               as: 'icd10_diagnoses', // ชื่อเล่นตรงกับ db/index.ts
+               required: false,
+               include: [
+                 {
+                   model: ICD10,
+                   as: 'icd10_detail', // ชื่อเล่นตรงกับ db/index.ts
+                   required: false,
+                   // ✅ แก้แล้ว: ใช้ชื่อฟิลด์จริงใน DB (name_th, name_en)
+                   attributes: ['code', 'name_th', 'name_en'] 
+                 }
                ]
             }
           ]
@@ -314,9 +316,8 @@ export const getPatientRecordById = async (req: Request, res: Response, next: Ne
 
     const patientJSON = patientWithRecord.toJSON();
     
-    // 🔥 [Fix] Calculate gender here too
     patientJSON.gender = getGenderFromPrefix(patientJSON.prefix);
-    patientJSON.bloodGroup = patientJSON.blood_group; // Map to match frontend
+    patientJSON.bloodGroup = patientJSON.blood_group;
 
     const visits = patientJSON.visits || [];
     delete patientJSON.visits;

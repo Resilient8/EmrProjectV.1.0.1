@@ -75,6 +75,7 @@
           </div>
 
           <div class="content-grid">
+
             <div class="left-panel">
               <div class="panel-header">
                 <div class="text-subtitle1 text-white text-weight-bold"><q-icon name="history" class="q-mr-sm text-cyan-3"/>ประวัติการรักษา</div>
@@ -108,6 +109,7 @@
             <div class="right-panel">
               <div class="content-frame-wrapper">
                 <transition name="fade" mode="out-in">
+
                   <q-card v-if="currentVisit" class="detail-card bg-transparent shadow-none" flat key="content">
                     <q-tab-panels v-model="currentMainTab" animated class="bg-transparent fit">
 
@@ -118,14 +120,44 @@
 
                         <div class="row q-col-gutter-md q-mb-md">
                           <div class="col-12 col-md-8">
-                            <div class="info-box h-full">
-                               <div class="box-label text-cyan-3">การวินิจฉัยหลัก</div>
-                               <div class="text-h4 text-weight-bold text-white q-mb-sm">{{ currentVisit.mainDiagnosis || '-' }}</div>
-                               <div class="text-grey-4 text-subtitle2">
-                                 <q-icon name="sick" class="q-mr-xs"/> อาการ: <span class="text-white">{{ currentVisit.symptoms.chiefComplaint }}</span>
-                               </div>
+                            <div class="info-box h-full relative-position overflow-hidden">
+                                <div class="absolute-right full-height" style="width: 150px; background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.05));"></div>
+
+                                <div class="box-label text-cyan-3 flex items-center">
+                                  <q-icon name="local_hospital" class="q-mr-xs"/> การวินิจฉัยหลัก
+                                </div>
+
+                                <div v-if="currentVisit.diagnosesList && currentVisit.diagnosesList.length > 0">
+                                   <div class="text-h4 text-weight-bold text-white q-mb-xs" style="line-height: 1.2;">
+                                      {{ currentVisit.diagnosesList[0].code }}
+                                      <span class="text-body1 text-grey-4" style="vertical-align: middle;">: {{ currentVisit.diagnosesList[0].name }}</span>
+                                   </div>
+
+                                   <div class="text-grey-4 text-subtitle2 q-mb-md">
+                                     <q-icon name="sick" class="q-mr-xs text-orange-4"/> อาการ: <span class="text-white">{{ currentVisit.symptoms.chiefComplaint }}</span>
+                                   </div>
+
+                                   <div v-if="currentVisit.diagnosesList.length > 1">
+                                      <q-separator dark class="q-my-sm opacity-20" />
+                                      <div class="text-caption text-purple-3 q-mb-sm flex items-center">
+                                        <q-icon name="format_list_bulleted" class="q-mr-xs"/> โรคร่วม / ภาวะแทรกซ้อน
+                                      </div>
+                                      <div class="row q-col-gutter-sm">
+                                        <div v-for="(diag, idx) in currentVisit.diagnosesList.slice(1)" :key="idx" class="col-auto">
+                                          <div class="comorbid-badge">
+                                            <div class="code-tag">{{ diag.code }}</div>
+                                            <div class="name-text">{{ diag.name }}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                   </div>
+                                </div>
+                                <div v-else>
+                                   <div class="text-h4 text-weight-bold text-white">-</div>
+                                </div>
                             </div>
                           </div>
+
                           <div class="col-12 col-md-4">
                              <div class="info-box h-full flex column justify-center items-center text-center">
                                 <div class="text-caption text-grey-5">วันที่เข้ารับการรักษา</div>
@@ -165,7 +197,6 @@
                          <div v-else class="text-grey-6 text-body2">ไม่มีการสั่งยา</div>
                       </q-tab-panel>
 
-
                       <q-tab-panel name="vitals" class="q-pa-lg scroll">
                         <div class="text-h6 text-white q-mb-md"><q-icon name="monitor_heart" class="q-mr-sm text-pink-4"/>สัญญาณชีพ</div>
                         <div class="vitals-grid">
@@ -183,7 +214,6 @@
                           </div>
                         </div>
                       </q-tab-panel>
-
 
                       <q-tab-panel name="symptoms" class="q-pa-lg scroll">
                         <div class="text-h6 text-white q-mb-md"><q-icon name="sick" class="q-mr-sm text-orange-4"/>อาการ</div>
@@ -233,13 +263,38 @@
                         </div>
                       </q-tab-panel>
 
-
                       <q-tab-panel name="treatment" class="q-pa-lg scroll">
                         <div class="text-h6 text-white q-mb-md"><q-icon name="medical_services" class="q-mr-sm text-green-4"/>การรักษา</div>
 
-                        <div class="diagnosis-box q-mb-lg">
-                          <div class="box-label text-cyan-3">การวินิจฉัยหลัก</div>
-                          <div class="diagnosis-text">{{ currentVisit.mainDiagnosis || '-' }}</div>
+                        <div v-if="currentVisit.diagnosesList && currentVisit.diagnosesList.length > 0">
+
+                          <div class="diagnosis-box main q-mb-md">
+                            <div class="row items-center justify-between q-mb-xs">
+                              <div class="box-label text-cyan-3 no-margin">การวินิจฉัยหลัก (Principal Diagnosis)</div>
+                              <q-badge color="cyan-3" text-color="black" label="Main" />
+                            </div>
+                            <div class="diagnosis-text-large">
+                              <span class="text-cyan-3 text-weight-bold q-mr-sm">{{ currentVisit.diagnosesList[0].code }}</span>
+                              <span class="text-white">{{ currentVisit.diagnosesList[0].name }}</span>
+                            </div>
+                          </div>
+
+                          <div v-if="currentVisit.diagnosesList.length > 1" class="q-mb-lg">
+                            <div class="text-subtitle2 text-purple-3 q-mb-sm flex items-center">
+                              <q-icon name="format_list_bulleted" class="q-mr-xs"/> โรคร่วม / ภาวะแทรกซ้อน (Co-morbidities)
+                            </div>
+                            <div class="secondary-diag-grid">
+                              <div v-for="(diag, idx) in currentVisit.diagnosesList.slice(1)" :key="idx" class="sec-diag-card">
+                                  <div class="sec-code">{{ diag.code }}</div>
+                                  <div class="sec-name">{{ diag.name }}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                        <div v-else class="diagnosis-box q-mb-lg">
+                          <div class="box-label text-grey-5">การวินิจฉัยหลัก</div>
+                          <div class="diagnosis-text text-grey-6">-</div>
                         </div>
 
                         <div v-if="currentVisit.procedures && currentVisit.procedures.length > 0" class="q-mb-lg">
@@ -266,36 +321,46 @@
                         </div>
                       </q-tab-panel>
 
+<q-tab-panel name="medication" class="q-pa-lg scroll">
+  <div class="text-h6 text-white q-mb-md flex items-center">
+    <q-icon name="vaccines" class="q-mr-sm text-teal-4"/>ยาและเวชภัณฑ์
+  </div>
 
-                      <q-tab-panel name="medication" class="q-pa-lg scroll">
-                         <div class="text-h6 text-white q-mb-md"><q-icon name="vaccines" class="q-mr-sm text-teal-4"/>ยาและเวชภัณฑ์</div>
+  <div v-if="currentVisit.prescriptions && currentVisit.prescriptions.length > 0">
+    <div class="column q-gutter-y-md">
+      <div v-for="(med, idx) in currentVisit.prescriptions" :key="idx" class="med-card-modern-v2">
 
-                         <div v-if="currentVisit.prescriptions && currentVisit.prescriptions.length > 0" class="row q-col-gutter-md">
-                            <div v-for="(med, idx) in currentVisit.prescriptions" :key="idx" class="col-12 col-md-6">
-                               <div class="med-card">
-                                  <div class="med-icon">
-                                    <q-icon name="pill" />
-                                  </div>
-                                  <div class="med-info">
-                                     <div class="med-name">{{ med.name }}</div>
-                                     <div class="med-usage">
-                                        <q-icon name="info" size="xs" class="q-mr-xs"/>
-                                        {{ med.usage || 'ไม่ระบุวิธีใช้' }}
-                                     </div>
-                                  </div>
-                                  <div class="med-qty">
-                                     <div class="qty-val">{{ med.qty }}</div>
-                                     <div class="qty-unit">QTY</div>
-                                  </div>
-                               </div>
-                            </div>
-                         </div>
+        <div class="med-left-section">
+          <div class="accent-bar-v2"></div>
+          <div class="med-icon-box-v2">
+             <q-icon name="medication" size="32px" />
+          </div>
+        </div>
 
-                         <div v-else class="empty-state-small">
-                            <q-icon name="no_drugs" size="50px" color="grey-7"/>
-                            <div class="text-grey-6 q-mt-sm">ไม่มีรายการยาในครั้งนี้</div>
-                         </div>
-                      </q-tab-panel>
+        <div class="med-content-v2">
+           <div class="med-name-v2">{{ med.name }}</div>
+           <div class="med-usage-wrapper-v2">
+              <q-icon name="schedule" size="16px" class="q-mr-xs text-teal-3" />
+              <div class="med-usage-text-v2">{{ med.usage || 'ไม่ระบุวิธีใช้' }}</div>
+           </div>
+        </div>
+
+        <div class="med-right-section">
+          <div class="med-qty-badge-v2">
+             <span class="qty-num-v2">{{ med.qty }}</span>
+             <span class="qty-label-v2">เม็ด</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div v-else class="empty-state-small">
+     <q-icon name="no_drugs" size="50px" color="grey-7"/>
+     <div class="text-grey-6 q-mt-sm">ไม่มีรายการยาในครั้งนี้</div>
+  </div>
+</q-tab-panel>
 
                     </q-tab-panels>
                   </q-card>
@@ -393,7 +458,6 @@
 
   </q-page>
 </template>
-
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -516,10 +580,23 @@ const processPatientData = (raw) => {
   };
 };
 
+// 🔥 แก้ไขฟังก์ชันนี้: ให้รองรับการดึง ICD-10 จากตารางใหม่ (visit_diagnoses)
+// ------------------------------------------------------------------
+// 📂 แก้ที่ไฟล์ Frontend (DoctorDiagnosisPage.vue)
+// ------------------------------------------------------------------
+
+// 📂 แก้ที่ไฟล์ Frontend: DoctorDiagnosisPage.vue
+
+// ------------------------------------------------------------------
+// 📂 ฟังก์ชัน processVisitData (Frontend) ฉบับสมบูรณ์
+// ------------------------------------------------------------------
+
 const processVisitData = (raw) => {
+  // 0. ดึงข้อมูลย่อย (Vital Signs & PI)
   const vs = raw.vitalSign || raw.vitalSigns || raw.vital_signs || {};
   const pi = raw.present_illness || raw.PresentIllness || raw.pi || raw.notes || '-';
 
+  // 1. จัดการ Chief Complaint (CC)
   let cc = '-';
   if (raw.symptoms?.chiefComplaints && Array.isArray(raw.symptoms.chiefComplaints)) {
       cc = raw.symptoms.chiefComplaints.map(c => c.name).join(', ');
@@ -529,9 +606,46 @@ const processVisitData = (raw) => {
     cc = raw.notes;
   }
 
-  const proceduresSource = raw.visitProcedures || raw.procedures || [];
-  const mainDiag = proceduresSource.find(p => p.diagnosis)?.diagnosis?.diagnosis_name || raw.diagnosis_note || 'ไม่ระบุ';
+  // 🔥 2. Logic การจัดการ Diagnosis (จุดสำคัญ)
+  let mainDiagString = 'ไม่ระบุ'; // สำหรับโชว์ใน Sidebar (String)
+  let diagnosesList = [];      // สำหรับโชว์ในหน้า Detail (Array)
 
+  if (raw.icd10_diagnoses && Array.isArray(raw.icd10_diagnoses) && raw.icd10_diagnoses.length > 0) {
+
+      // 2.1 เรียงลำดับจาก ID น้อย -> มาก (เพื่อให้ตัวแรกที่กรอก เป็นตัวหลักเสมอ)
+      const sortedDiagnoses = [...raw.icd10_diagnoses].sort((a, b) => a.id - b.id);
+
+      // 2.2 แปลงข้อมูลลง Array เพื่อเตรียมวนลูป
+      diagnosesList = sortedDiagnoses.map(d => {
+          if (d.icd10_detail) {
+              const code = d.icd10_detail.code || '';
+              // ดึงชื่ออังกฤษ ถ้าไม่มีเอาชื่อไทย
+              const name = d.icd10_detail.name_en || d.icd10_detail.name_th || '';
+
+              return {
+                  code: code,
+                  name: name,
+                  full: `${code}: ${name}` // ไว้ใช้กรณีอยากโชว์เต็มๆ
+              };
+          }
+          return null;
+      }).filter(Boolean); // กรองค่า null ทิ้ง
+
+      // 2.3 เซ็ตค่าที่จะโชว์ใน Sidebar (เอาแค่ตัวแรกตัวเดียว จะได้ไม่รก)
+      if (diagnosesList.length > 0) {
+          mainDiagString = diagnosesList[0].full;
+      }
+  }
+  // Fallback: กรณีเป็นข้อมูลเก่าที่ไม่มี ICD-10
+  else if (raw.diagnosis_note) {
+      mainDiagString = raw.diagnosis_note;
+      diagnosesList = [{ code: '', name: raw.diagnosis_note, full: raw.diagnosis_note }];
+  }
+
+  // 3. จัดการ Procedures (บริการ/หัตถการ)
+  const proceduresSource = raw.visitProcedures || raw.procedures || [];
+
+  // 4. จัดการ ROS (Review of Systems)
   const rosData = [
     { label: 'อาการทั่วไป', value: raw.ros_general },
     { label: 'ศีรษะและลำคอ', value: raw.ros_head_and_neck },
@@ -541,18 +655,21 @@ const processVisitData = (raw) => {
     { label: 'ระบบผิวหนัง', value: raw.ros_skin }
   ].filter(item => item.value && item.value !== '-' && parseRosItems(item.value).length > 0);
 
-  // 🔥 Process Prescriptions (รายการยา)
+  // 5. จัดการ Prescriptions (ยา)
   const prescriptionsData = (raw.prescriptions || []).map(p => ({
-      // p.product มาจาก relation, ถ้าไม่มีให้ดู p.drug_name (เผื่อ field legacy)
       name: p.product?.product_name || p.drug_name || 'ยาไม่ระบุชื่อ',
       qty: p.quantity || '-',
-      usage: p.instruction || '-' // Database field ชื่อ instruction
+      usage: p.instruction || '-'
   }));
 
+  // Return Formatted Object
   return {
     id: raw.visit_id,
     visitDate: raw.visit_datetime,
-    mainDiagnosis: mainDiag,
+
+    // ✅ ส่งค่าออกไป 2 แบบ
+    mainDiagnosis: mainDiagString, // แบบ String (สำหรับ Sidebar)
+    diagnosesList: diagnosesList,  // แบบ Array (สำหรับหน้า Detail เอาไปแยก Main/Secondary)
 
     vitalSigns: [
       { label: 'ความดัน', value: (vs.blood_pressure_systolic && vs.blood_pressure_diastolic) ? `${vs.blood_pressure_systolic}/${vs.blood_pressure_diastolic}` : '-', unit: 'mmHg', icon: 'bloodtype', color: 'pink', ref: '< 120/80' },
@@ -572,7 +689,6 @@ const processVisitData = (raw) => {
       ros: rosData
     },
 
-    // ส่งรายการยาไปให้ frontend ใช้
     prescriptions: prescriptionsData,
 
     procedures: proceduresSource.flatMap(p => [
@@ -612,8 +728,7 @@ $cyan: #22d3ee;
 .external-header { height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.9); border-bottom: $border; }
 .back-button-glassy { background: rgba(255,255,255,0.05); color: #94a3b8; border: $border; &:hover { background: rgba(255,255,255,0.1); color: white; } }
 .glassy-tab-group { background: rgba(0,0,0,0.2); padding: 4px; border-radius: 50px; display: flex; gap: 8px; }
-.tab-button-glassy { color: #64748b;width: 130px; /* กำหนดความกว้างให้เท่ากันทุกปุ่ม (ปรับตัวเลขได้ตามชอบ) */
-  justify-content: center; font-weight: 600; &.is-active { background: $cyan; color: #0f172a; box-shadow: 0 0 15px rgba(34,211,238,0.3); } }
+.tab-button-glassy { color: #64748b; width: 130px; justify-content: center; font-weight: 600; &.is-active { background: $cyan; color: #0f172a; box-shadow: 0 0 15px rgba(34,211,238,0.3); } }
 
 /* Layout & Panels */
 .layout-container-wrapper { flex: 1; padding: 16px; overflow: hidden; display: flex; }
@@ -634,17 +749,22 @@ $cyan: #22d3ee;
 .empty-state-small { text-align: center; padding: 40px; opacity: 0.7; }
 .patient-info-wrapper { display: flex; align-items: center; cursor: pointer; width: 100%; &:hover { .text-h6 { color: $cyan; } } }
 .avatar-ring { padding: 2px; border: 2px solid $cyan; border-radius: 50%; display: flex; }
-/* แก้ไขตรงนี้ครับ */
+
+/* Alert Badges */
 .alert-badge {
   display: flex; align-items: center; justify-content: flex-start; padding: 0 12px;
   width: 85px; height: 28px; border-radius: 14px;
   font-size: 0.85rem; font-weight: 600; color: white; box-shadow: none;
 
   &.drug { background: #ef4444; }      /* สีแดง (แพ้ยา) */
-  &.food { background: #f97316; }      /* 🔥 เพิ่มบรรทัดนี้: สีส้ม (แพ้อาหาร) */
+  &.food { background: #f97316; }      /* สีส้ม (แพ้อาหาร) */
   &.disease { background: #9333ea; }   /* สีม่วง (โรคประจำตัว) */
-}.badge-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 6px; }
+}
+.badge-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 6px; }
+
 .opacity-20 { opacity: 0.2; } .h-full { height: 100%; } .no-margin { margin: 0; }
+
+/* Profile Dialog */
 .profile-dialog { width: 650px; background: #1e293b; color: white; border-radius: 16px; border: $border; }
 .close-btn { position: absolute; top: 10px; right: 10px; color: #94a3b8; z-index: 10; }
 .profile-avatar { overflow: hidden; border: 4px solid #1e293b; box-shadow: 0 0 0 2px $cyan, 0 0 20px rgba(34, 211, 238, 0.4); background-color: #334155; }
@@ -663,21 +783,125 @@ $cyan: #22d3ee;
 .unit { font-size: 0.9rem; font-weight: normal; color: #94a3b8; margin-left: 4px; }
 .vital-ref { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
 
-/* 🔥 New: Medication Cards */
-.med-card {
-  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px;
-  padding: 16px; display: flex; align-items: center; gap: 16px; transition: all 0.2s;
-  &:hover { background: rgba(255, 255, 255, 0.06); transform: translateY(-2px); border-color: rgba(45, 212, 191, 0.3); }
-}
-.med-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(45, 212, 191, 0.15); color: #2dd4bf; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-.med-info { flex: 1; }
-.med-name { font-size: 1.1rem; font-weight: bold; color: white; margin-bottom: 4px; }
-.med-usage { font-size: 0.9rem; color: #94a3b8; display: flex; align-items: center; }
-.med-qty { text-align: right; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 8px; }
-.qty-val { font-size: 1.2rem; font-weight: bold; color: #2dd4bf; }
-.qty-unit { font-size: 0.7rem; color: #64748b; }
+/* 🔥 Modern Medication Card Style V2 (Reworked Layout) */
+.med-card-modern-v2 {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 16px;
+  padding: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
 
-/* 🔥 New: Summary Page Elements */
+  &:hover {
+    background: rgba(45, 212, 191, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(45, 212, 191, 0.4);
+    .med-icon-box-v2 {
+      background: rgba(45, 212, 191, 0.25);
+      color: #fff;
+      transform: scale(1.05);
+    }
+  }
+}
+
+/* ส่วนซ้าย: แถบสี + ไอคอน */
+.med-left-section {
+  display: flex;
+  align-items: center;
+  margin-right: 16px;
+  position: relative;
+}
+
+.accent-bar-v2 {
+  position: absolute;
+  left: -12px; /* ติดขอบซ้ายสุด */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 60%;
+  background: #2dd4bf;
+  border-radius: 0 4px 4px 0;
+  opacity: 0.7;
+}
+
+.med-icon-box-v2 {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(45, 212, 191, 0.15);
+  color: #2dd4bf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* ส่วนกลาง: ข้อมูลยา */
+.med-content-v2 {
+  flex: 1; /* ขยายเต็มพื้นที่ที่เหลือ */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 16px; /* เว้นระยะจากส่วนขวา */
+}
+
+.med-name-v2 {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+
+.med-usage-wrapper-v2 {
+  display: flex;
+  align-items: center;
+}
+
+.med-usage-text-v2 {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* ส่วนขวา: จำนวน */
+.med-right-section {
+  display: flex;
+  align-items: center;
+}
+
+.med-qty-badge-v2 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.8); /* พื้นหลังเข้มขึ้น */
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  padding: 8px 16px;
+  border-radius: 12px;
+  min-width: 70px;
+}
+
+.qty-num-v2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #2dd4bf;
+  line-height: 1;
+}
+
+.qty-label-v2 {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Summary Page Elements */
 .mini-vital-card { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; display: flex; align-items: center; gap: 10px; }
 .med-capsule { background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.2); padding: 8px 12px; border-radius: 30px; display: flex; align-items: center; color: white; font-size: 0.95rem; }
 .badge-qty { background: #2dd4bf; color: black; font-size: 0.75rem; font-weight: bold; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
@@ -689,13 +913,102 @@ $cyan: #22d3ee;
 .capsule-wrapper { display: flex; flex-wrap: wrap; gap: 8px; }
 .ros-capsule { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; line-height: 1.4; background: rgba(34, 211, 238, 0.15); color: #a5f3fc; border: 1px solid rgba(34, 211, 238, 0.2); backdrop-filter: blur(4px); transition: background 0.2s; &:hover { background: rgba(34, 211, 238, 0.25); color: white; } &.more { background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px dashed rgba(255, 255, 255, 0.2); cursor: help; &:hover { background: rgba(255, 255, 255, 0.1); color: white; border-color: rgba(255, 255, 255, 0.4); } } }
 
-/* Shared */
+/* Shared Info Box */
 .info-box, .diagnosis-box { background: rgba(255,255,255,0.03); border: $border; border-radius: 12px; padding: 20px; }
 .box-label { text-transform: uppercase; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px; }
 .box-content, .diagnosis-text { font-size: 1.1rem; color: white; line-height: 1.5; }
 .diagnosis-text { font-size: 1.5rem; font-weight: bold; color: $cyan; }
 .procedure-item { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 8px; color: #e2e8f0; display: flex; align-items: center; }
+
+/* Alert Box (Dialog) */
 .alert-box { padding: 12px; border-radius: 8px; height: 100%; display: flex; flex-direction: column; .head { font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; font-size: 1rem; } .body { font-size: 0.95rem; line-height: 1.4; flex: 1; } &.warning { background: rgba(239,68,68,0.1); color: #fca5a5; } &.info { background: rgba(249, 115, 22, 0.1); color: #fdba74; } &.disease { background: rgba(147, 51, 234, 0.1); color: #e9d5ff; } }
+
+/* Cropper */
 .cropper-container { height: 400px; background: #0f172a; }
 .cropper-background { background: #0f172a; }
+
+/* =========================================
+   🔥 NEW & UPDATED STYLES (Diagnosis UI)
+   ========================================= */
+
+/* 1. Summary Tab: Comorbidities Badge (สีม่วง) */
+.comorbid-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(168, 85, 247, 0.1); /* พื้นหลังม่วงจางๆ */
+  border: 1px solid rgba(168, 85, 247, 0.3); /* เส้นขอบม่วง */
+  border-radius: 8px;
+  padding: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(168, 85, 247, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+  }
+}
+.code-tag {
+  background: #a855f7; /* สีม่วงเข้ม */
+  color: white;
+  font-weight: bold;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-right: 8px;
+}
+.name-text {
+  color: #e9d5ff; /* สีม่วงอ่อน */
+  font-size: 0.9rem;
+  padding-right: 8px;
+  font-weight: 500;
+}
+
+/* 2. Treatment Tab: Diagnosis Boxes */
+.diagnosis-box.main {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(34, 211, 238, 0.02) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 20px rgba(34, 211, 238, 0.15);
+}
+
+.diagnosis-text-large {
+  font-size: 1.6rem;
+  line-height: 1.3;
+}
+
+/* 3. Treatment Tab: Secondary Diagnosis Grid */
+.secondary-diag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.sec-diag-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168, 85, 247, 0.2); /* สีม่วงอ่อน */
+  border-left: 4px solid #a855f7; /* แถบสีม่วงด้านซ้าย */
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: translateX(4px);
+    background: rgba(168, 85, 247, 0.1);
+  }
+}
+
+.sec-code {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #d8b4fe; /* ม่วงอ่อน */
+  min-width: 50px;
+}
+
+.sec-name {
+  color: #e2e8f0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
 </style>

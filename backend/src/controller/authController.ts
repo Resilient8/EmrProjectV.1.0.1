@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import User from '../models/user'; // ตรวจสอบว่า path นี้ตรงกับไฟล์ User Model ของคุณ
+import User from '../models/user'; 
 import { Op } from 'sequelize';
+import jwt from 'jsonwebtoken'; 
 
 // =========================================================
-// ✅ ฟังก์ชัน Register (ลงทะเบียน)
+// ✅ ฟังก์ชัน Register
 // =========================================================
 export const register = async (req: Request, res: Response) => {
   try {
@@ -17,14 +18,13 @@ export const register = async (req: Request, res: Response) => {
     }
 
     // สร้าง User ใหม่
-    // ⚠️ หมายเหตุ: ใน Production ควรใช้ bcrypt hash password ก่อนบันทึก
     const newUser = await User.create({
       prefix,
       first_name,
       last_name,
       email,
       phone,
-      password_hash: password, 
+      password_hash: password, // ใช้ password ตรงๆ (Dev Mode)
       role
     });
 
@@ -38,59 +38,54 @@ export const register = async (req: Request, res: Response) => {
 };
 
 // =========================================================
-// ✅ ฟังก์ชัน Login (แบบ Super Debug 🛠️)
+// ✅ ฟังก์ชัน Login (แก้เวลา Token แล้ว)
 // =========================================================
 export const login = async (req: Request, res: Response) => {
   try {
     console.log("------------------------------------------------");
     console.log("📥 1. Login Process Started");
-    console.log("📥 Payload received:", req.body);
 
     const { email, username, password } = req.body;
-    
-    // 1. แปลงให้เป็นตัวพิมพ์เล็ก และตัดช่องว่างหน้าหลัง (Trim)
-    // เพื่อให้ avatar01@... กับ Avatar01@... ถือเป็นอันเดียวกัน
-    const loginIdentifier = (email || username || '').trim(); // เอา .toLowerCase() ออกก่อนเผื่อใน DB คุณเก็บตัวใหญ่
-
-    console.log(`🔎 2. Searching User by Identifier: "${loginIdentifier}"`);
+    const loginIdentifier = (email || username || '').trim();
 
     if (!loginIdentifier) {
-        console.log("❌ Missing identifier (No email/username provided)");
         return res.status(400).json({ message: 'กรุณาระบุ Email หรือ Username' });
     }
 
-    // 2. ค้นหา User (ใช้ loginIdentifier หาในช่อง email)
+    // 1. ค้นหา User
     const user = await User.findOne({ 
         where: { email: loginIdentifier } 
     });
 
-    // 🛑 เช็คจุดที่ 1: เจอ User ในฐานข้อมูลไหม?
     if (!user) {
-        console.log("❌ User Not Found in Database!");
-        
-        // แอบดูข้อมูลใน DB หน่อยว่ามีใครบ้าง (เอามา 5 คนแรก)
-        const allUsers = await User.findAll({ limit: 5, attributes: ['email', 'role'] });
-        console.log("💡 Tips: รายชื่อที่มีอยู่ใน DB ตอนนี้:", allUsers.map(u => `${u.email} (${u.role})`));
-        
         return res.status(401).json({ message: 'ไม่พบผู้ใช้งานนี้ในระบบ' });
     }
 
-    console.log("✅ User Found:", user.email);
-    console.log("🔑 Password stored in DB:", user.password_hash);
-    console.log("🔑 Password sent from Client:", password);
-
-    // 🛑 เช็คจุดที่ 2: รหัสผ่านตรงไหม?
-    // (หมายเหตุ: ถ้าคุณเข้ารหัสด้วย bcrypt ต้องเปลี่ยนบรรทัดนี้เป็น bcrypt.compare)
+    // 2. เช็ค Password
     if (user.password_hash !== password) {
-        console.log("❌ Password Mismatch! (รหัสผ่านไม่ตรง)");
         return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
     }
 
-    console.log("✅ Login Success! Generating Response...");
+    console.log("✅ Login Success! Generating Token...");
 
-    // 3. Login สำเร็จ -> ส่งข้อมูลกลับ
+    // 3. สร้าง Token (แจกบัตรผ่านทาง)
+    const secretKey = process.env.JWT_SECRET || 'secret_key';
+    
+    const token = jwt.sign(
+        { 
+            userId: user.user_id, 
+            email: user.email, 
+            role: user.role 
+        },
+        secretKey,
+        // 🔥🔥🔥 แก้ตรงนี้: เปลี่ยนจาก '1d' เป็น '30d' (อยู่ได้ 30 วัน) 🔥🔥🔥
+        { expiresIn: '30d' } 
+    );
+
+    // 4. ส่งข้อมูลกลับ
     res.status(200).json({
       message: 'เข้าสู่ระบบสำเร็จ',
+      token: token, 
       user: {
         id: user.user_id,
         email: user.email,
@@ -104,7 +99,7 @@ export const login = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('🔥 Login Exception (Code 500):', error);
+    console.error('🔥 Login Error:', error);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ', error: error.message });
   }
 };

@@ -42,33 +42,24 @@ export const getAllDoctors = async (req: Request, res: Response) => {
 // ---------------------------------------------------------
 // 2. Get Patient Queue (ดึงคิวผู้ป่วยที่ส่งมาหาหมอคนนั้นๆ)
 // ---------------------------------------------------------
+// backend/src/controller/doctor.controller.ts
+
 export const getPatientQueue = async (req: Request, res: Response) => {
     try {
         const queryDate = req.query.date as string;
-        const doctorId = req.query.doctor_id;
+        const doctorId = req.query.doctor_id; // ถ้าเป็น Admin ค่านี้จะเป็น undefined
 
-        // กำหนดสถานะที่หมอต้องเห็นในคิว
-        const doctorStatuses = [
-            'รอพบแพทย์',
-            'กำลังรักษา',
-            'รักษาเสร็จสิ้น',
-            'รอผลแล็บ',
-            'รอผลเอ็กซเรย์',
-            'รอรับยา',
-            'กำลังรับยา',
-            'จ่ายยาแล้ว'
-        ];
+        // ✅ ปลดล็อค: เริ่มต้นด้วยเงื่อนไขว่างเปล่า (ไม่กรองสถานะแล้ว เอามาหมด!)
+        const visitWhere: any = {}; 
 
-        const visitWhere: any = {
-            status: { [Op.in]: doctorStatuses }
-        };
-
-        // กรองตาม ID ของหมอที่ได้รับมอบหมาย
+        // 1. กรองตาม ID หมอ (ถ้ามีส่งมา)
+        // - หมอ: จะส่ง ID มา -> กรองเฉพาะของตัวเอง
+        // - Admin: ไม่ส่ง ID มา -> ข้ามตรงนี้ไป -> เห็นของทุกคน
         if (doctorId) {
             visitWhere.referral_doctor = String(doctorId); 
         }
 
-        // กรองตามวันที่ (ถ้าเลือกวันที่เฉพาะเจาะจง)
+        // 2. กรองตามวันที่ (ถ้าเลือกวันที่เฉพาะเจาะจง)
         if (queryDate && queryDate !== 'all') {
             const startDate = new Date(queryDate);
             startDate.setHours(0, 0, 0, 0);
@@ -81,8 +72,9 @@ export const getPatientQueue = async (req: Request, res: Response) => {
             };
         }
 
+        // 3. ดึงข้อมูลจาก Database
         const patientQueue = await Visit.findAll({
-            where: visitWhere,
+            where: visitWhere, // ส่งเงื่อนไขที่ปลดล็อคแล้วเข้าไป
             include: [
                 {
                     model: Patient,
@@ -91,12 +83,12 @@ export const getPatientQueue = async (req: Request, res: Response) => {
                     as: 'Patient',
                 },
                 {
-                    model: VitalSign, // 🔥 เพิ่ม: เพื่อให้หมอเห็นค่า Vitals พื้นฐานในคิวได้เลย
+                    model: VitalSign, 
                     as: 'vitalSign',
                     required: false
                 },
                 {
-                    model: User, // 🔥 [Audit] เพิ่ม: เพื่อดูว่าพยาบาลคนไหนเป็นคนเปิดเคส (recorder_id)
+                    model: User, 
                     as: 'recordedBy', 
                     attributes: ['first_name', 'last_name'],
                     required: false
@@ -116,11 +108,12 @@ export const getPatientQueue = async (req: Request, res: Response) => {
                 }
             ],
             order: [
-                ['status', 'DESC'], // ให้ 'รอพบแพทย์' มาก่อนสถานะอื่น
-                ['visit_datetime', 'ASC'] // ใครมาก่อนตรวจก่อน
+                // เรียงลำดับตามเวลา (ใครมาก่อนอยู่บน)
+                ['visit_datetime', 'ASC'] 
             ]
         });
 
+        // 4. จัดรูปแบบข้อมูลส่งกลับไปหน้าบ้าน
         const formattedQueue = patientQueue.map((visitModel: any) => {
             const visit = visitModel.toJSON();
             const patient = visit.Patient || {};
@@ -160,10 +153,9 @@ export const getPatientQueue = async (req: Request, res: Response) => {
                 age: age,
                 symptoms: symptomsArray,
                 chief_complaint: fallbackComplaint,
-                vitalSigns: visit.vitalSign || null, // ส่งค่า Vitals ไปด้วย
+                vitalSigns: visit.vitalSign || null,
                 visit_datetime: visit.visit_datetime,
                 status: visit.status,
-                // 🔥 [Audit] ส่งชื่อพยาบาลผู้คัดกรองกลับไปด้วย
                 screened_by: visit.recordedBy ? `${visit.recordedBy.first_name} ${visit.recordedBy.last_name}` : 'ไม่ระบุ',
                 priority: visit.status === 'รอพบแพทย์' ? 1 : 2,
                 referral_notes: visit.referral_notes
