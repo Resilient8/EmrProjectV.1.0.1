@@ -17,16 +17,13 @@ const sequelize = new Sequelize(
         port: Number(process.env.DATABASE_PORT) || 17790,
         dialect: 'mysql',
         logging: false,
-        // 🔥 เพิ่มส่วนนี้เข้าไปครับ 🔥
+        // 🔥 เพิ่มส่วนนี้เข้าไป 🔥
         define: {
-            freezeTableName: true, // ห้าม Sequelize เปลี่ยนชื่อตารางเอง (เช่น เติม s ท้ายชื่อ)
-            underscored: true,     // ใช้ snake_case (ตัวพิมพ์เล็กมี _ คั่น) แทน camelCase
-            timestamps: true       // หรือตามที่คุณตั้งค่าไว้ใน Model
+            freezeTableName: true, // ห้าม Sequelize เปลี่ยนชื่อตารางเอง
+            underscored: true      // ใช้ตัวพิมพ์เล็กและ snake_case
         },
         dialectOptions: isProduction ? {
-            ssl: {
-                rejectUnauthorized: false
-            }
+            ssl: { rejectUnauthorized: false }
         } : {}
     }
 );

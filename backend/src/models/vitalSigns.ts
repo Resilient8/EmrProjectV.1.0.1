@@ -57,7 +57,7 @@ VitalSign.init({
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'Visits',
+      model: 'visits',
       key: 'visit_id',
     },
   },
@@ -76,7 +76,7 @@ VitalSign.init({
     type: DataTypes.INTEGER,
     allowNull: true,
     references: {
-      model: 'Users',
+      model: 'users',
       key: 'user_id'
     }
   }
