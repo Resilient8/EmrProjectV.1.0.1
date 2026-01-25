@@ -9,7 +9,7 @@ export interface VisitSymptomAttributes {
   level?: string | null;
   details?: string | null;
   locations?: any;
-  recorded_by?: number | null; // 🔥 [เพิ่มใหม่] ID พยาบาล/หมอ ผู้ซักประวัติอาการนี้
+  recorded_by?: number | null;
 }
 
 class VisitSymptom extends Model<VisitSymptomAttributes> implements VisitSymptomAttributes {
@@ -20,13 +20,11 @@ class VisitSymptom extends Model<VisitSymptomAttributes> implements VisitSymptom
   public level!: string | null;
   public details!: string | null;
   public locations!: any;
-  public recorded_by!: number | null; // 🔥 [เพิ่มใหม่]
+  public recorded_by!: number | null;
 
   static associate(models: any) {
     this.belongsTo(models.Visit, { foreignKey: 'visit_id', as: 'visit' });
     this.belongsTo(models.Symptom, { foreignKey: 'symptom_id', as: 'symptom' });
-    
-    // 🔥 [เพิ่มใหม่] เชื่อมไปที่ User เพื่อดูชื่อผู้บันทึกอาการ
     this.belongsTo(models.User, { foreignKey: 'recorded_by', as: 'recordedBy' });
   }
 }
@@ -40,12 +38,14 @@ VisitSymptom.init({
   visit_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    references: { model: 'Visits', key: 'visit_id' }
+    // ✨ เปลี่ยนเป็น 'visits' (ตัวเล็ก)
+    references: { model: 'visits', key: 'visit_id' } 
   },
   symptom_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    references: { model: 'Symptoms', key: 'id' }
+    // ✨ เปลี่ยนเป็น 'symptoms' (ตัวเล็ก)
+    references: { model: 'symptoms', key: 'id' } 
   },
   duration: { type: DataTypes.STRING, allowNull: true },
   level: { type: DataTypes.STRING, allowNull: true },
@@ -55,16 +55,19 @@ VisitSymptom.init({
     allowNull: true,
     defaultValue: []
   },
-  // 🔥 [เพิ่มใหม่] ฟิลด์เก็บตัวตนผู้ซักประวัติ
   recorded_by: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    references: { model: 'Users', key: 'user_id' }
+    // ✨ เปลี่ยนเป็น 'users' (ตัวเล็ก)
+    references: { model: 'users', key: 'user_id' } 
   }
 }, {
   sequelize,
-  tableName: 'visitSymptoms', // ✅ ใช้ชื่อเดิมที่คุณตั้งไว้
-  timestamps: false 
+  // ✨ แนะนำใช้ 'visit_symptoms' เพื่อความเป็นระเบียบใน Linux
+  tableName: 'visit_symptoms', 
+  timestamps: false,
+  freezeTableName: true,
+  underscored: true // บังคับให้เป็นตัวเล็กและใช้ snake_case
 });
 
 export default VisitSymptom;
