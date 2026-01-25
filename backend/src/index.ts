@@ -66,26 +66,41 @@ app.use('/api/users', userRoutes);
 app.use('/api/visit-diagnoses', visitDiagnosisRoutes); // ✅
 
 // =========================================================
-// 🔥 4. DATABASE SYNC & SERVER START (ฉบับแยก Environment)
+// 🔥 4. DATABASE SYNC & SERVER START (ฉบับแก้ปัญหาตารางค้าง)
 // =========================================================
 
-// ตรวจสอบว่าอยู่บน Production (Render) หรือไม่
 const isProduction = process.env.NODE_ENV === 'production';
 
-// เลือก Option: Production ให้ล้างตาราง (force), Local ให้แค่แก้ไข (alter)
-const syncOptions = isProduction ? { force: true } : { alter: true };
+async function startServer() {
+    try {
+        if (isProduction) {
+            console.log("🛠️ Production Mode: Clearing old schema...");
+            // 1. ปิดระบบเช็ค Foreign Key เพื่อให้ลบตารางที่มีความสัมพันธ์ค้างอยู่ได้
+            await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+            
+            // 2. สั่งล้างและสร้างใหม่ทั้งหมด (force: true)
+            await db.sequelize.sync({ force: true });
+            
+            // 3. เปิดระบบเช็ค Foreign Key กลับคืนมา
+            await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+            console.log("✨ Schema rebuilt successfully.");
+        } else {
+            // ในเครื่องเราใช้ alter ปกติเหมือนเดิม
+            await db.sequelize.sync({ alter: true });
+            console.log("🔵 Development Mode: Schema updated.");
+        }
 
-db.sequelize.sync(syncOptions).then(() => {
-    const syncMode = isProduction ? "🔴 PRODUCTION (FORCE RESET)" : "🔵 DEVELOPMENT (ALTER)";
-    console.log(`\n✅ Database connection: STABLE`);
-    console.log(`📡 Sync Mode: ${syncMode}`);
-    
-    app.listen(port, "0.0.0.0", () => {
-        console.log(`🚀 EMR Backend is running on: http://localhost:${port}`);
-        console.log(`📂 Uploads directory: ${path.join(__dirname, '../uploads')}`);
-        console.log(`---------------------------------------------------\n`);
-    });
-}).catch((err: any) => {
-    console.error("❌ Database Sync Error:", err);
-});
+        console.log("\n✅ Database connection: STABLE");
+        app.listen(port, "0.0.0.0", () => {
+            console.log(`🚀 Server is running on: http://localhost:${port}`);
+        });
+
+    } catch (err) {
+        // หากเกิดข้อผิดพลาด ให้พยายามเปิด FK Checks กลับมาก่อนเพื่อความปลอดภัย
+        if (isProduction) await db.sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+        console.error("❌ Database Sync Error:", err);
+    }
+}
+
+startServer();
 export default app;
