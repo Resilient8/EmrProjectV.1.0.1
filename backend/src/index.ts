@@ -66,16 +66,20 @@ app.use('/api/users', userRoutes);
 app.use('/api/visit-diagnoses', visitDiagnosisRoutes); // ✅
 
 // =========================================================
-// 4. DATABASE SYNC & SERVER START
+// 🔥 4. DATABASE SYNC & SERVER START (ฉบับแก้ไข)
 // =========================================================
-db.sequelize.sync().then(() => {
+
+// ใส่ { alter: true } เพื่อให้ระบบช่วยสร้างตารางที่สัมพันธ์กันได้ถูกต้อง
+db.sequelize.sync({ alter: true }).then(() => {
     console.log("\n✅ Database connection: STABLE");
+    
     app.listen(port, "0.0.0.0", () => {
         console.log(`🚀 EMR Backend is running on: http://localhost:${port}`);
         console.log(`📂 Uploads directory: ${path.join(__dirname, '../uploads')}`);
         console.log(`---------------------------------------------------\n`);
     });
 }).catch((err: any) => {
+    // หากติดเรื่องเดิม ให้ลองเปลี่ยนเป็น { force: true } (ระวัง: ข้อมูลเดิมจะหายหมด)
     console.error("❌ Database Sync Error:", err);
 });
 
