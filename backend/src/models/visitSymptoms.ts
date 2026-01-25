@@ -45,7 +45,7 @@ VisitSymptom.init({
     type: DataTypes.INTEGER,
     allowNull: false,
     // ✨ เปลี่ยนเป็น 'symptoms' (ตัวเล็ก)
-    references: { model: 'symptoms', key: 'id' } 
+    references: { model: 'symptoms', key: 'symptom_id' } 
   },
   duration: { type: DataTypes.STRING, allowNull: true },
   level: { type: DataTypes.STRING, allowNull: true },
