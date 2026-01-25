@@ -167,7 +167,7 @@ Visit.init({
 
 }, {
   sequelize,
-  tableName: 'Visits', 
+  tableName: 'visits', 
   timestamps: false
 });
 

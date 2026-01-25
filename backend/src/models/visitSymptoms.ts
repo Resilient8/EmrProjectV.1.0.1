@@ -63,7 +63,7 @@ VisitSymptom.init({
   }
 }, {
   sequelize,
-  tableName: 'VisitSymptoms', // ✅ ใช้ชื่อเดิมที่คุณตั้งไว้
+  tableName: 'visitSymptoms', // ✅ ใช้ชื่อเดิมที่คุณตั้งไว้
   timestamps: false 
 });
 
