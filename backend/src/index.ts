@@ -66,12 +66,19 @@ app.use('/api/users', userRoutes);
 app.use('/api/visit-diagnoses', visitDiagnosisRoutes); // ✅
 
 // =========================================================
-// 🔥 4. DATABASE SYNC & SERVER START (ฉบับแก้ไข)
+// 🔥 4. DATABASE SYNC & SERVER START (ฉบับแยก Environment)
 // =========================================================
 
-// ใส่ { alter: true } เพื่อให้ระบบช่วยสร้างตารางที่สัมพันธ์กันได้ถูกต้อง
-db.sequelize.sync({ alter: true }).then(() => {
-    console.log("\n✅ Database connection: STABLE");
+// ตรวจสอบว่าอยู่บน Production (Render) หรือไม่
+const isProduction = process.env.NODE_ENV === 'production';
+
+// เลือก Option: Production ให้ล้างตาราง (force), Local ให้แค่แก้ไข (alter)
+const syncOptions = isProduction ? { force: true } : { alter: true };
+
+db.sequelize.sync(syncOptions).then(() => {
+    const syncMode = isProduction ? "🔴 PRODUCTION (FORCE RESET)" : "🔵 DEVELOPMENT (ALTER)";
+    console.log(`\n✅ Database connection: STABLE`);
+    console.log(`📡 Sync Mode: ${syncMode}`);
     
     app.listen(port, "0.0.0.0", () => {
         console.log(`🚀 EMR Backend is running on: http://localhost:${port}`);
@@ -79,8 +86,6 @@ db.sequelize.sync({ alter: true }).then(() => {
         console.log(`---------------------------------------------------\n`);
     });
 }).catch((err: any) => {
-    // หากติดเรื่องเดิม ให้ลองเปลี่ยนเป็น { force: true } (ระวัง: ข้อมูลเดิมจะหายหมด)
     console.error("❌ Database Sync Error:", err);
 });
-
 export default app;
